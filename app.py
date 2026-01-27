@@ -43,10 +43,7 @@ model = gemini_ayarla()
 # 3. ARAYÜZ VE BAŞLIKLAR
 # ---------------------------------------------------------
 st.title("🤖 MarmaraTOG WhatsApp Asistanı")
-st.markdown("""
-Bu asistan, yüklediğiniz WhatsApp geçmişini analiz eder ve sorularınızı cevaplar.
-**Kullanılan Model:** Gemini 1.5 Flash (Hızlı ve Ekonomik)
-""")
+st.markdown("Bu asistan, yüklediğiniz WhatsApp geçmişini analiz eder ve sorularınızı cevaplar.")
 
 # ---------------------------------------------------------
 # 4. DOSYA YÜKLEME VE İŞLEME
