@@ -7,7 +7,6 @@ import os
 # ---------------------------------------------------------
 # 1. AYARLAR
 # ---------------------------------------------------------
-# Sayfa Başlığı Güncellendi
 st.set_page_config(page_title="Sohbet Analiz Paneli", page_icon="📊", layout="wide")
 
 def gemini_ayarla():
@@ -33,7 +32,6 @@ def demo_veri_olustur():
     }
     return pd.DataFrame(data)
 
-# --- ANA BAŞLIK GÜNCELLENDİ ---
 st.title("📊 Sohbet Analiz Paneli")
 
 # ---------------------------------------------------------
@@ -47,7 +45,6 @@ secim = st.sidebar.radio(
 
 df = None
 
-# --- SENARYO 1: KULLANICI YÜKLER ---
 if secim == "📂 Kendi Dosyamı Yükle":
     uploaded_file = st.sidebar.file_uploader("WhatsApp Excel'i Yükle", type=["xlsx", "xls"])
     if uploaded_file:
@@ -56,7 +53,6 @@ if secim == "📂 Kendi Dosyamı Yükle":
         except Exception as e:
             st.error(f"Dosya okunamadı: {e}")
 
-# --- SENARYO 2: HAZIR GERÇEK VERİ ---
 elif secim == "📁 Hazır Veri Seti (Gerçek)":
     dosya_yolu = "ornek_veri.xlsx"
     if os.path.exists(dosya_yolu):
@@ -68,7 +64,6 @@ elif secim == "📁 Hazır Veri Seti (Gerçek)":
     else:
         st.sidebar.warning("⚠️ 'ornek_veri.xlsx' dosyası sunucuda bulunamadı.")
 
-# --- SENARYO 3: DEMO MODU ---
 elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo veriler oluşturuldu.")
@@ -77,10 +72,8 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 # 4. ANALİZ VE GÖRSELLEŞTİRME
 # ---------------------------------------------------------
 if df is not None:
-    # --- VERİ TEMİZLİĞİ ---
     df = df.replace("Fatih Sarı", "+90 545 655 91 18")
     
-    # --- OTOMATİK SÜTUN TAHMİNİ ---
     tahmini_isim = next((c for c in df.columns if any(x in c.lower() for x in ['onderen','ender','author'])), df.columns[0])
     tahmini_tarih = next((c for c in df.columns if any(x in c.lower() for x in ['arih','date','ime'])), df.columns[1] if len(df.columns)>1 else df.columns[0])
 
@@ -91,10 +84,8 @@ if df is not None:
 
     tab1, tab2 = st.tabs(["📈 İstatistik Paneli", "💬 Yapay Zeka Asistanı"])
 
-    # --- TAB 1: DASHBOARD ---
     with tab1:
         st.markdown("### 🚀 Genel Bakış")
-        
         c1, c2 = st.columns(2)
         with c1:
             col_left = st.selectbox("Sol Grafik Verisi:", df.columns, index=df.columns.get_loc(tahmini_isim))
@@ -112,7 +103,6 @@ if df is not None:
             m3.metric(f"Lider", str(top_left)[:15]+"..." if len(str(top_left))>15 else str(top_left))
             
             st.divider()
-
             g1, g2 = st.columns(2)
 
             with g1:
@@ -177,6 +167,25 @@ if df is not None:
 
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
+        
+        # --- YENİ EKLENEN BÖLÜM: ÖRNEK SORULAR ---
+        with st.expander("💡 Ne sorabilirim? (İlham Al)", expanded=True):
+            st.markdown("""
+            **Genel Analiz:**
+            -  "Bu grubun genel amacı ne? Konuşmalar ne üzerine?"
+            -  "Grupta en çok tartışılan konu neydi?"
+            -  "Grubun genel kişilik analizini yapabilir misin?"
+            
+            **Kişiler Hakkında:**
+            -  "Grubun 'gizli lideri' kim gibi duruyor?"
+            -  "Kimler birbiriyle daha iyi anlaşıyor?"
+            -  "Grubun en meraklısı kim?"
+
+            **Detaylı Bilgi:**
+            -  "Yakın zamanda planlanan bir etkinlik veya buluşma var mı?"
+            -  "Cevaplanmamış önemli bir soru var mı?"
+            """)
+        
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
         if prompt := st.chat_input("Sorunuzu yazın..."):
