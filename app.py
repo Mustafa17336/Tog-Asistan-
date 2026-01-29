@@ -7,7 +7,7 @@ import os
 import emoji
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-import re # Regex kütüphanesi (Link temizliği için şart)
+import re
 
 # ---------------------------------------------------------
 # 1. AYARLAR
@@ -42,9 +42,8 @@ def emojileri_ayikla(text):
     return [item['emoji'] for item in emoji_listesi]
 
 def kelime_bulutu_olustur(df, mesaj_sutunu):
-    # --- SENİN GÖNDERDİĞİN AGRESIF YASAKLI LİSTE ---
+    # --- AGRESIF YASAKLI LİSTE ---
     agresif_yasaklar = {
-        # Zamirler ve Bağlaçlar
         "bir", "iki", "üç", "ve", "ile", "de", "da", "bu", "şu", "o", "ben", "sen", "biz", "siz", 
         "onlar", "bana", "sana", "bize", "size", "benim", "senin", "bizim", "sizin", "bende", 
         "sende", "bizde", "sizde", "bunu", "şunu", "onu", "buna", "şuna", "ona", "böyle", "şöyle",
@@ -52,13 +51,9 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "ama", "fakat", "lakin", "ancak", "veya", "ya", "hem", "eğer", "zaten", "hani", "işte",
         "yani", "dolayı", "ötürü", "üzere", "rağmen", "karşı", "kendi", "kendine", "kendim","icin","çünkü",
         "konuda","halde","icin",
-        
-        # WhatsApp / Sistem Kalıntıları
         "mesaj", "silindi", "medya", "dahil", "edilmedi", "görüntü", "video", "ses", "dosya",
         "kişisi", "tarafından", "eklendi", "ayrıldı", "katıldı", "grup", "gruba", "bağlantısıyla",
         "davet", "link", "https", "http", "www", "com", "tr", "android", "iphone", "web",
-        
-        # Konuşma Dili / Dolgu Kelimeleri
         "evet", "hayır", "tamam", "peki", "olur", "olmaz", "şey", "çok", "daha", "en", "biraz",
         "az", "fazla", "kadar", "sadece", "tek", "bence", "sence", "galiba", "sanırım", "belki",
         "keşke", "neyse", "tabi", "tabii", "aynen", "kesinlikle", "mutlaka", "lütfen", "rica",
@@ -79,30 +74,31 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "iletişime","adına","okula"
     }
 
-    # --- SENİN TEMİZLİK FONKSİYONUN ---
+    # --- TEMİZLİK FONKSİYONU ---
     def metni_temizle(text):
         text = str(text).lower() 
-        text = re.sub(r'http\S+', '', text) # Linkleri kökten sil
+        text = re.sub(r'http\S+', '', text) 
         text = re.sub(r'www\S+', '', text)
         text = text.replace("bu mesaj silindi", "") 
         text = text.replace("<medya dahil edilmedi>", "")
-        text = re.sub(r'[^\w\s]', '', text) # Noktalama işaretlerini sil
+        text = re.sub(r'[^\w\s]', '', text) 
         return text
 
     # Veriyi temizle
     temiz_seri = df[mesaj_sutunu].dropna().apply(metni_temizle)
     text = " ".join(temiz_seri.tolist())
     
-    # --- SENİN WORDCLOUD AYARLARIN ---
+    # --- WORDCLOUD AYARLARI (KOYU MOD) ---
     wordcloud = WordCloud(
         width=1600, 
         height=800, 
-        background_color='white', # BEYAZ ARKA PLAN
+        background_color='#0E1117', # <-- STREAMLIT KOYU GRİSİ
+        colormap='viridis',         # <-- YEŞİL/MOR NEON TONLAR
         stopwords=agresif_yasaklar,
         min_font_size=10,
         min_word_length=3,
         collocations=False,
-        max_words=100 # En önemli 100 kelime
+        max_words=100
     ).generate(text)
     
     return wordcloud
@@ -190,7 +186,9 @@ if df is not None:
             if col_mesaj and col_mesaj in df.columns:
                 try:
                     wc = kelime_bulutu_olustur(df, col_mesaj)
-                    fig, ax = plt.subplots(figsize=(12, 6)) # Boyutu biraz büyüttüm
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    # Arkasını şeffaf yapıp siteye yedirelim
+                    fig.patch.set_facecolor('#0E1117') 
                     ax.imshow(wc, interpolation='bilinear')
                     ax.axis("off")
                     st.pyplot(fig)
