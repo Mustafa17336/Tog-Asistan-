@@ -129,7 +129,7 @@ elif secim == "🧪 Demo Modu (Yapay Veri)":
 # ---------------------------------------------------------
 if df is not None:
     # Güvenlik önlemi (İsim maskeleme - Opsiyonel)
-    
+    df = df.replace("Fatih Sarı", "+90 545 655 91 18")
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
