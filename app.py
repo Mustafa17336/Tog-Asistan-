@@ -144,7 +144,7 @@ if df is not None:
         st.markdown("### 🚀 Genel Bakış")
         c1, c2 = st.columns(2)
         with c1: selected_user_col = st.selectbox("İnceleme Sütunu:", cols, index=cols.get_loc(col_isim))
-        with c2: selected_date_col = st.selectbox("Zaman Sütunu:", cols, index=cols.get_loc(col_tarih))
+        with c2: selected_date_col = st.selectbox("Zaman Satırı:", cols, index=cols.get_loc(col_tarih))
 
         if selected_user_col and selected_date_col:
             m1, m2, m3 = st.columns(3)
