@@ -30,7 +30,7 @@ def demo_veri_olustur():
     data = {
         'Tarih': ['01.01.2026']*4 + ['02.01.2026']*4,
         'Saat': ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
-        'Gönderen': ['Ali']*4 + ['Ayşe']*4,
+        'Gönderen': ['+90 532 100 20 30']*4 + ['Ayşe']*4, # Numaralı örnek
         'Mesaj': ['Selam proje harika 🥳', 'Naber? Toplantı ne zaman? 👍🏻', 'Harika iş çıkardık! 🔥', 'Görüşürüz yarın 👋', 'Toplantı iptal mi?', 'Proje bitti mi?', 'Evet bitti 👍🏻', 'Kutlama yapalım 🥳'],
         'Tip': ['Yazı']*8
     }
@@ -73,7 +73,6 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "iletişime","adına","okula"
     }
 
-    # --- METİN TEMİZLEME ---
     def metni_temizle(text):
         text = str(text).lower() 
         text = re.sub(r'http\S+', '', text) 
@@ -83,14 +82,11 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         text = re.sub(r'[^\w\s]', '', text) 
         return text
 
-    # Veriyi temizle
     temiz_seri = df[mesaj_sutunu].dropna().apply(metni_temizle)
     text = " ".join(temiz_seri.tolist())
     
-    if not text.strip():
-        return None
+    if not text.strip(): return None
 
-    # --- WORDCLOUD ---
     wordcloud = WordCloud(
         width=1600, 
         height=800, 
@@ -111,7 +107,6 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
 st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
 
-# Sadece 2 seçenek kaldı:
 secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "🧪 Demo Modu (Sentetik)"])
 
 df = None
@@ -131,16 +126,13 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-    # ❌ İSİM MASKELEME İPTAL EDİLDİ - VERİ OLDUĞU GİBİ GELECEK
-    # df = df.replace("Fatih Sarı", "545 655 91 18")  <-- BU SATIR KALDIRILDI
+     df = df.replace("Fatih Sarı", "+90 545 655 91 18") <-- 
     
-    # Otomatik Sütun Tahmini
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author','sender'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
     col_mesaj = next((c for c in cols if any(x in c.lower() for x in ['mesaj','message','icerik','text'])), cols[-1])
 
-    # Chat formatı için
     chat_df = df.iloc[::-1]
     text_data = ""
     for index, row in chat_df.head(3000).iterrows():
@@ -148,42 +140,36 @@ if df is not None:
 
     tab1, tab2 = st.tabs(["📈 İstatistik Paneli", "💬 Yapay Zeka Asistanı"])
 
-    # --- TAB 1: DASHBOARD ---
     with tab1:
         st.markdown("### 🚀 Genel Bakış")
         c1, c2 = st.columns(2)
-        with c1: selected_user_col = st.selectbox("Kişi Sütunu (Örn: Gönderen):", cols, index=cols.get_loc(col_isim))
-        with c2: selected_date_col = st.selectbox("Zaman Sütunu (Örn: Tarih/Saat):", cols, index=cols.get_loc(col_tarih))
+        with c1: selected_user_col = st.selectbox("Kişi Sütunu:", cols, index=cols.get_loc(col_isim))
+        with c2: selected_date_col = st.selectbox("Zaman Sütunu:", cols, index=cols.get_loc(col_tarih))
 
         if selected_user_col and selected_date_col:
-            # Metrikler
-            total_msgs = len(df)
-            active_users = df[selected_user_col].nunique()
-            top_user = df[selected_user_col].mode()[0] if not df[selected_user_col].mode().empty else "Yok"
-            
             m1, m2, m3 = st.columns(3)
-            m1.metric("Toplam Mesaj", total_msgs)
-            m2.metric("Aktif Kişi", active_users)
-            m3.metric("Lider", str(top_user)[:15]+"...")
-            
+            m1.metric("Toplam Mesaj", len(df))
+            m2.metric("Aktif Kişi", df[selected_user_col].nunique())
+            m3.metric("Lider", str(df[selected_user_col].mode()[0])[:15]+"...")
             st.divider()
 
             g1, g2 = st.columns(2)
             
-            # --- GRAFİK 1: EN ÇOK YAZANLAR (SANSÜRSÜZ LİSTE) ---
+            # --- GRAFİK 1: EN ÇOK YAZANLAR (SADECE GERÇEK VERİ) ---
             with g1:
                 st.subheader("🏆 En Çok Yazanlar")
                 try:
-                    # En çok mesaj atan 10 kişiyi (veya numarayı) olduğu gibi alıyoruz
+                    # Direkt sütundaki veriyi sayıyoruz, değişiklik yapmadan.
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
-                    uc.columns = ["Kullanici", "MesajSayisi"] 
+                    uc.columns = ["Kullanici", "MesajSayisi"]
                     
+                    # Plotly ile çizim
                     fig_users = px.bar(uc, x='MesajSayisi', y='Kullanici', orientation='h', 
                                        text='MesajSayisi', color='MesajSayisi', color_continuous_scale='Blues')
-                    fig_users.update_layout(yaxis=dict(autorange="reversed"), xaxis_title="Mesaj Sayısı", yaxis_title="Kişi")
+                    # Sıralamayı en çoktan en aza yap
+                    fig_users.update_layout(yaxis=dict(autorange="reversed"), xaxis_title="Mesaj Sayısı", yaxis_title=None)
                     st.plotly_chart(fig_users, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Kişi grafiği oluşturulamadı.\nHata: {e}")
+                except Exception as e: st.warning(f"Grafik hatası: {e}")
 
             # --- GRAFİK 2: ZAMAN ANALİZİ ---
             with g2:
@@ -197,15 +183,11 @@ if df is not None:
                         st.plotly_chart(fig_time, use_container_width=True)
                     else:
                         d = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
-                        if d.empty:
-                            st.warning("⚠️ Tarih verisi bulunamadı.")
-                        else:
-                            dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
-                            dc.columns = ['Tarih', 'GunlukMesaj']
-                            fig_date = px.area(dc, x='Tarih', y='GunlukMesaj', line_group=None, color_discrete_sequence=['#2ecc71'])
-                            st.plotly_chart(fig_date, use_container_width=True)
-                            
-                except Exception as e: st.error(f"Zaman grafiği hatası: {e}")
+                        dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
+                        dc.columns = ['Tarih', 'GunlukMesaj']
+                        fig_date = px.area(dc, x='Tarih', y='GunlukMesaj', color_discrete_sequence=['#2ecc71'])
+                        st.plotly_chart(fig_date, use_container_width=True)
+                except Exception as e: st.warning(f"Grafik hatası: {e}")
 
             st.divider()
 
@@ -220,7 +202,7 @@ if df is not None:
                         ax.imshow(wc, interpolation='bilinear')
                         ax.axis("off")
                         st.pyplot(fig)
-                    else: st.info("Kelime bulutu için veri yok.")
+                    else: st.info("Veri yok.")
                 except Exception as e: st.error(f"Hata: {e}")
             
             st.divider()
@@ -252,30 +234,24 @@ if df is not None:
                     else: st.info("Emoji bulunamadı.")
                 except Exception as e: st.error(f"Emoji hatası: {e}")
 
-    # --- TAB 2: ASİSTAN ---
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
-        
         with st.expander("💡 Örnek Sorular", expanded=True):
             st.markdown("""
             -  Grup hakkında bana neler söyleyebilirsin?
             -  Grubun genel kişilik analizini çıkarabilir misin?
-            -  Grubun gizli lideri kim?
+            -  Grubun en hararetli tartışmasının konusu neydi?
             -  Kimler birbiriyle daha iyi anlaşıyor?
             -  Yakın zamanda planlanan bir etkinlik var mı?
             -  Kasım ayında neler yapılmış?
             """)
 
-        if "messages" not in st.session_state: 
-            st.session_state.messages = []
-
-        for m in st.session_state.messages: 
-            st.chat_message(m["role"]).markdown(m["content"])
+        if "messages" not in st.session_state: st.session_state.messages = []
+        for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
 
         if prompt := st.chat_input("Sorunuzu yazın..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             st.chat_message("user").markdown(prompt)
-            
             with st.chat_message("assistant"):
                 with st.spinner("Analiz ediliyor..."):
                     try:
@@ -283,5 +259,4 @@ if df is not None:
                         response = model.generate_content(full_prompt)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e: 
-                        st.error(f"Hata: {e}")
+                    except Exception as e: st.error(f"Hata: {e}")
