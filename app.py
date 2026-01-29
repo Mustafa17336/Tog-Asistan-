@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import pandas as pd
 import altair as alt
+import plotly.express as px  # <-- YENİ OYUNCU: Plotly
 import os
 import re
 from collections import Counter
@@ -35,19 +36,15 @@ def demo_veri_olustur():
     return pd.DataFrame(data)
 
 def emojileri_ayikla(text):
-    # Regex ile emojileri bul
     emoji_pattern = re.compile(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002600-\U000026FF\U00002700-\U000027BF]', flags=re.UNICODE)
     found = emoji_pattern.findall(str(text))
-    
-    # FİLTRE: Bozuk karakterleri, ten rengi kodlarını ve geometrik şekilleri at
-    # Bu liste, ekran görüntüsündeki o "kare" şekli gibi gereksizleri engeller.
+    # Yasaklı listesi (Bozuk karakterler)
     yasakli_liste = ['🏻', '🏼', '🏽', '🏾', '🏿', '♂️', '♀️', '⃣', '️', '⃣', '〰', '▪', '▫', '▶', '◀', '◻', '◼', '◾', '◽']
-    
     temiz_emojiler = [e for e in found if e not in yasakli_liste]
     return temiz_emojiler
 
 # ---------------------------------------------------------
-# 3. ARAYÜZ VE VERİ SEÇİMİ
+# 3. ARAYÜZ
 # ---------------------------------------------------------
 st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
@@ -80,15 +77,11 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 if df is not None:
     df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
     
-    # Sütunları Otomatik Bul
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
-    
-    # Mesaj Sütunu (Öncelikli olarak 'Mesaj' veya 'Message' ara, yoksa en son sütunu al)
     col_mesaj = next((c for c in cols if any(x in c.lower() for x in ['mesaj','message','icerik','text'])), cols[-1])
 
-    # Chat Verisi
     chat_df = df.iloc[::-1]
     text_data = ""
     for index, row in chat_df.head(3000).iterrows():
@@ -149,10 +142,9 @@ if df is not None:
 
             st.divider()
 
-            # --- EMOJİ ANALİZİ (OTOMATİK VE FİLTRELİ) ---
+            # --- EMOJİ ANALİZİ (PLOTLY İLE GÜÇLENDİRİLDİ) ---
             st.markdown("### 🤩 Emoji Analizi")
             
-            # Artık kullanıcıya sütun sormuyoruz, 'col_mesaj'ı kullanıyoruz.
             if col_mesaj and col_mesaj in df.columns:
                 all_text = " ".join(df[col_mesaj].dropna().astype(str).tolist())
                 found_emojis = emojileri_ayikla(all_text)
@@ -165,22 +157,29 @@ if df is not None:
                     
                     with e1:
                         st.subheader("En Çok Kullanılan Emojiler")
-                        e_chart = alt.Chart(emoji_df).mark_bar().encode(
-                            x=alt.X('Adet', title='Kullanım Sayısı'),
-                            y=alt.Y('Emoji', sort='-x', title=None),
-                            color=alt.Color('Adet', legend=None),
-                            tooltip=['Emoji', 'Adet']
-                        ).properties(height=400)
-                        
-                        text = e_chart.mark_text(align='left', dx=2).encode(text='Adet')
-                        st.altair_chart(e_chart + text, use_container_width=True)
+                        # PLOTLY İLE ÇİZİYORUZ (RENKLİ OLSUN DİYE)
+                        fig = px.bar(
+                            emoji_df, 
+                            x='Emoji', 
+                            y='Adet',
+                            text='Adet',
+                            color='Adet', # Renklendirme sayıya göre olsun
+                            color_continuous_scale='Viridis' # Güzel bir renk paleti
+                        )
+                        fig.update_layout(
+                            xaxis_title=None, 
+                            yaxis_title=None,
+                            showlegend=False,
+                            height=400
+                        )
+                        # Emojilerin font büyüklüğünü artır
+                        fig.update_xaxes(tickfont=dict(size=24))
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     with e2:
                         st.subheader("Lider Emoji 👑")
                         top_emoji = emoji_df.iloc[0]['Emoji']
                         top_count = emoji_df.iloc[0]['Adet']
-                        
-                        # Emojiyi grafik yerine HTML olarak basıyoruz (Daha düzgün görünür)
                         st.markdown(
                             f"""
                             <div style='text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 10px;'>
@@ -191,11 +190,10 @@ if df is not None:
                             unsafe_allow_html=True
                         )
                 else:
-                    st.info("Bu sohbette (veya seçilen sütunda) hiç emoji bulunamadı. 😐")
+                    st.info("Bu sohbette hiç emoji bulunamadı. 😐")
             else:
                 st.warning("Mesaj sütunu otomatik tespit edilemedi.")
 
-    # --- TAB 2: ASİSTAN ---
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
         with st.expander("💡 Örnek Sorular", expanded=True):
