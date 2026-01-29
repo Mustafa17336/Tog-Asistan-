@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import pandas as pd
 import altair as alt
+import os
 
 # ---------------------------------------------------------
 # 1. AYARLAR
@@ -19,52 +20,73 @@ def gemini_ayarla():
 model = gemini_ayarla()
 
 # ---------------------------------------------------------
-# 2. DEMO VERİ OLUŞTURUCU (YENİ ÖZELLİK) 🧪
+# 2. DEMO VERİ OLUŞTURUCU
 # ---------------------------------------------------------
 def demo_veri_olustur():
     data = {
-        'Tarih': ['01.01.2026', '01.01.2026', '02.01.2026', '02.01.2026', '02.01.2026', '03.01.2026', '03.01.2026', '03.01.2026', '03.01.2026', '04.01.2026', '04.01.2026'],
-        'Saat': ['10:00', '10:05', '14:30', '14:32', '15:00', '09:00', '09:15', '12:00', '12:30', '20:00', '21:00'],
-        'Gönderen': ['Ayşe (Başkan)', 'Mehmet (Yazılım)', 'Ayşe (Başkan)', 'Ali (Tasarım)', 'Mehmet (Yazılım)', 'Ali (Tasarım)', 'Ayşe (Başkan)', 'Mehmet (Yazılım)', 'Mehmet (Yazılım)', 'Ayşe (Başkan)', 'Ali (Tasarım)'],
-        'Mesaj': ['Arkadaşlar proje teslimine az kaldı.', 'Ben backend tarafını hallettim.', 'Tasarım ne durumda Ali?', 'Renk paletini seçtim, atıyorum birazdan.', 'Harikasın, ben de veritabanını bağlıyorum.', 'Günaydın, logo revizesi bitti.', 'Süper, toplantı yapalım mı?', 'Ben acıktım, yemekhaneye inen var mı?', 'Bugün köfte varmış beyler.', 'Raporu sisteme yükledim.', 'Ellerine sağlık başkan.'],
-        'Tip': ['Yazı', 'Yazı', 'Yazı', 'Yazı', 'Yazı', 'Medya', 'Yazı', 'Yazı', 'Yazı', 'Yazı', 'Yazı']
+        'Tarih': ['01.01.2026', '01.01.2026', '02.01.2026', '02.01.2026', '03.01.2026', '03.01.2026', '04.01.2026', '04.01.2026'],
+        'Saat': ['10:00', '10:05', '14:30', '15:00', '09:00', '12:00', '20:00', '21:00'],
+        'Gönderen': ['Ayşe (Başkan)', 'Mehmet (Yazılım)', 'Ayşe (Başkan)', 'Mehmet (Yazılım)', 'Ali (Tasarım)', 'Mehmet (Yazılım)', 'Ayşe (Başkan)', 'Ali (Tasarım)'],
+        'Mesaj': ['Proje ne durumda?', 'Backend bitti.', 'Tasarım nerede?', 'Veritabanı hazır.', 'Logo revizesi tamam.', 'Yemekhaneye giden?', 'Rapor yüklendi.', 'Eline sağlık.'],
+        'Tip': ['Yazı', 'Yazı', 'Yazı', 'Yazı', 'Medya', 'Yazı', 'Yazı', 'Yazı']
     }
     return pd.DataFrame(data)
 
 st.title("📊 MarmaraTOG Analiz Paneli")
 
 # ---------------------------------------------------------
-# 3. VERİ YÜKLEME VE SEÇİM
+# 3. VERİ KAYNAĞI SEÇİMİ (YENİLENDİ) 🎛️
 # ---------------------------------------------------------
-st.sidebar.header("Veri Kaynağı")
-uploaded_file = st.sidebar.file_uploader("WhatsApp Excel'i Yükle", type=["xlsx", "xls"])
-demo_mode = st.sidebar.checkbox("📂 Örnek Veri ile Dene (Demo)", value=False)
+st.sidebar.header("1. Veri Kaynağı Seçin")
+secim = st.sidebar.radio(
+    "Nasıl devam etmek istersiniz?",
+    ["📂 Kendi Dosyamı Yükle", "📁 Hazır Veri Seti (Gerçek)", "🧪 Demo Modu (Sentetik)"]
+)
 
 df = None
 
-# Mantık: Dosya varsa dosyayı al, yoksa ve Demo seçiliyse Demoyu al.
-if uploaded_file:
-    try:
-        df = pd.read_excel(uploaded_file)
-        # İsim Düzeltme (Fatih Sarı -> Numara)
-        df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
-    except Exception as e:
-        st.error(f"Dosya okunamadı: {e}")
-elif demo_mode:
+# --- SENARYO 1: KULLANICI YÜKLER ---
+if secim == "📂 Kendi Dosyamı Yükle":
+    uploaded_file = st.sidebar.file_uploader("WhatsApp Excel'i Yükle", type=["xlsx", "xls"])
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file)
+        except Exception as e:
+            st.error(f"Dosya okunamadı: {e}")
+
+# --- SENARYO 2: HAZIR GERÇEK VERİ ---
+elif secim == "📁 Hazır Veri Seti (Gerçek)":
+    dosya_yolu = "ornek_veri.xlsx" # Klasördeki dosya adı
+    if os.path.exists(dosya_yolu):
+        try:
+            df = pd.read_excel(dosya_yolu)
+            st.sidebar.success(f"✅ Hazır veri seti yüklendi! ({len(df)} satır)")
+        except Exception as e:
+            st.error(f"Hazır dosya okunurken hata: {e}")
+    else:
+        st.sidebar.warning("⚠️ 'ornek_veri.xlsx' dosyası sunucuda bulunamadı.")
+
+# --- SENARYO 3: DEMO MODU ---
+elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
-    st.toast("🧪 Demo Modu Aktif! Örnek veriler yüklendi.")
+    st.sidebar.info("🧪 Demo veriler oluşturuldu.")
 
 # ---------------------------------------------------------
 # 4. ANALİZ VE GÖRSELLEŞTİRME
 # ---------------------------------------------------------
 if df is not None:
+    # --- VERİ TEMİZLİĞİ ---
+    # İsim maskeleme (Varsa Fatih Sarı'yı gizle)
+    df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
+    
     # --- OTOMATİK SÜTUN TAHMİNİ ---
     tahmini_isim = next((c for c in df.columns if any(x in c.lower() for x in ['onderen','ender','author'])), df.columns[0])
     tahmini_tarih = next((c for c in df.columns if any(x in c.lower() for x in ['arih','date','ime'])), df.columns[1] if len(df.columns)>1 else df.columns[0])
 
     chat_df = df.iloc[::-1]
     text_data = ""
-    for index, row in chat_df.iterrows():
+    # Sadece son 3000 satırı alalım ki çok büyük dosyalarda prompt şişmesin
+    for index, row in chat_df.head(3000).iterrows():
         text_data += " | ".join([str(val) for val in row.values]) + "\n"
 
     tab1, tab2 = st.tabs(["📈 İstatistik Paneli", "💬 Yapay Zeka Asistanı"])
@@ -93,16 +115,14 @@ if df is not None:
 
             g1, g2 = st.columns(2)
 
-            # --- SOL GRAFİK ---
             with g1:
                 st.subheader(f"🏆 {col_left} Analizi")
                 if df[col_left].nunique() > 1000:
-                    st.warning(f"⚠️ Çok fazla çeşitlilik var, tablo gösteriliyor.")
+                    st.warning("⚠️ Çok fazla veri var, tablo gösteriliyor.")
                     st.dataframe(df[col_left].value_counts().head(10), use_container_width=True)
                 else:
                     data_counts = df[col_left].value_counts().head(10).reset_index()
                     data_counts.columns = [col_left, "Adet"]
-                    
                     chart = alt.Chart(data_counts).mark_bar().encode(
                         x=alt.X('Adet', title='Sayısı'),
                         y=alt.Y(col_left, sort='-x', title=None),
@@ -111,70 +131,52 @@ if df is not None:
                     ).properties(height=400)
                     st.altair_chart(chart, use_container_width=True)
 
-            # --- SAĞ GRAFİK ---
             with g2:
                 st.subheader(f"📊 {col_right} Dağılımı")
-                
+                is_time = "saat" in col_right.lower() or "time" in col_right.lower()
                 is_date = False
                 try:
                     parsed_dates = pd.to_datetime(df[col_right], dayfirst=True, errors='coerce')
-                    valid_dates = parsed_dates.dropna()
-                    if len(valid_dates) > len(df) * 0.5: is_date = True
-                except: is_date = False
-
-                is_time = "saat" in col_right.lower() or "time" in col_right.lower()
+                    if len(parsed_dates.dropna()) > len(df) * 0.5: is_date = True
+                except: pass
 
                 if is_time:
                     time_counts = df[col_right].value_counts().head(24).reset_index()
                     time_counts.columns = [col_right, "Adet"]
                     time_counts = time_counts.sort_values(by=col_right)
-                    
                     c_time = alt.Chart(time_counts).mark_bar().encode(
-                        x=alt.X(col_right, title='Saat', sort=None),
-                        y=alt.Y('Adet', title='Mesaj Sayısı'),
+                        x=alt.X(col_right, title='Saat'),
+                        y=alt.Y('Adet', title='Mesaj'),
                         color=alt.value("orange"),
                         tooltip=[col_right, 'Adet']
                     ).properties(height=400)
                     st.altair_chart(c_time, use_container_width=True)
-
                 elif is_date:
                     daily = df.groupby(parsed_dates.dt.date).size().reset_index(name='Adet')
                     daily.columns = ['Tarih', 'Adet']
-                    
                     c_date = alt.Chart(daily).mark_area(
                         line={'color':'darkgreen'},
-                        color=alt.Gradient(
-                            gradient='linear',
-                            stops=[alt.GradientStop(color='darkgreen', offset=0), alt.GradientStop(color='white', offset=1)],
-                            x1=1, x2=1, y1=1, y2=0
-                        )
+                        color=alt.Gradient(gradient='linear', stops=[alt.GradientStop(color='darkgreen', offset=0), alt.GradientStop(color='white', offset=1)], x1=1, x2=1, y1=1, y2=0)
                     ).encode(
-                        x=alt.X('Tarih:T', title='Zaman Çizelgesi'),
-                        y=alt.Y('Adet:Q', title='Günlük Aktivite'),
+                        x=alt.X('Tarih:T', title='Zaman'),
+                        y=alt.Y('Adet:Q', title='Aktivite'),
                         tooltip=[alt.Tooltip('Tarih:T', format='%d %b %Y'), 'Adet']
                     ).properties(height=400)
                     st.altair_chart(c_date, use_container_width=True)
-
                 else:
                     cat_counts = df[col_right].value_counts().head(10).reset_index()
                     cat_counts.columns = ["Kategori", "Adet"]
-                    
                     base = alt.Chart(cat_counts).encode(theta=alt.Theta("Adet", stack=True))
                     pie = base.mark_arc(outerRadius=120, innerRadius=60).encode(
                         color=alt.Color("Kategori"),
                         order=alt.Order("Adet", sort="descending"),
                         tooltip=["Kategori", "Adet"]
                     )
-                    text = base.mark_text(radius=140).encode(
-                        text=alt.Text("Adet"),
-                        order=alt.Order("Adet", sort="descending"),
-                        color=alt.value("white")  
-                    )
+                    text = base.mark_text(radius=140).encode(text=alt.Text("Adet"), order=alt.Order("Adet", sort="descending"), color=alt.value("white"))
                     st.altair_chart(pie + text, use_container_width=True)
 
     with tab2:
         st.subheader("💬 Sohbet Analizi")
-        st.info("💡 İpucu: Demo modunda yapay zekaya 'Ayşe ne zaman toplantı istemiş?' veya 'Mehmet ne yemek istiyor?' diye sorabilirsin.")
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
         if prompt := st.chat_input("Sorunuzu yazın..."):
@@ -191,5 +193,4 @@ if df is not None:
                         st.error(f"Hata: {e}")
 
 else:
-    # Karşılama Ekranı
-    st.info("👈 Başlamak için sol menüden Excel yükleyin veya **Demo Modunu** açın.")
+    st.info("👈 Başlamak için sol menüden bir veri kaynağı seçin.")
