@@ -223,7 +223,15 @@ if df is not None:
 
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
-        with st.expander("💡 Örnek Sorular", expanded=True): st.markdown("- 🧐 Grubun amacı ne?\n- 🔥 En hararetli tartışma neydi?\n- 😂 En komik anlar neler?")
+       with st.expander("💡 Örnek Sorular", expanded=True):
+            st.markdown("""
+            -  Grup hakkında bana neler söyleyebilirsin?
+            -  Grubun genel kişilik analizini çıkarabilir misin?
+            -  Grubun gizli lideri kim?
+            -  Kimler birbiriyle daha iyi anlaşıyor?
+            -  Yakın zamanda planlanan bir etkinlik var mı?
+            -  Kasım ayında neler yapılmış?
+            """)
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
         if prompt := st.chat_input("Sorunuzu yazın..."):
