@@ -121,10 +121,19 @@ elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
+# --- İMZA ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 👨‍💻 Geliştirici")
+st.sidebar.caption("Bu proje **Gemini 2.5 Flash** altyapısı kullanılarak geliştirilmiştir.")
+st.sidebar.info("**Fatih Sarı**\nMarmara Üniv. İstatistik 📉")
+
 # ---------------------------------------------------------
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
+    # 👇 BURASI: İsim Yerine Numara Göster (İstediğin numarayı yaz)
+    df = df.replace("Fatih Sarı", "+90 545 655 91 18") 
+    
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author','sender'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
@@ -154,7 +163,7 @@ if df is not None:
             
             # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - SOL GRAFİK) ---
             with g1:
-                st.subheader(" Mesaj Frekans Analizi")
+                st.subheader("🏆 En Çok Yazanlar")
                 try:
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
                     uc.columns = ["Deger", "Adet"] 
@@ -169,13 +178,11 @@ if df is not None:
                     st.altair_chart(chart, use_container_width=True)
                 except Exception as e: st.warning(f"Grafik hatası: {e}")
 
-            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY - SAĞ GRAFİK - TAMİR EDİLDİ) ---
+            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY - SAĞ GRAFİK) ---
             with g2:
                 st.subheader("📊 Zaman Analizi")
                 try:
-                    # Senaryo A: Eğer sütun "Saat" içeriyorsa -> Sadece Saati (00-23) al
                     if any(x in selected_date_col.lower() for x in ['saat','time','hour']):
-                        # Saatleri temizle (Sadece ilk 2 haneyi al: "14:39" -> "14")
                         df['TempSaat'] = df[selected_date_col].astype(str).str[:2]
                         tc = df['TempSaat'].value_counts().reset_index()
                         tc.columns = ["Saat", "Adet"]
@@ -184,12 +191,10 @@ if df is not None:
                         fig_time = px.bar(tc, x='Saat', y='Adet', color='Adet', color_continuous_scale='Oranges')
                         fig_time.update_layout(xaxis_title="Saat Dilimi (00-23)", yaxis_title="Mesaj Sayısı")
                         st.plotly_chart(fig_time, use_container_width=True)
-                    
-                    # Senaryo B: Tarih ise
                     else:
                         d = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
                         if d.empty:
-                            st.warning("⚠️ Seçilen sütunda zaman verisi okunamadı. Lütfen 'Tarih veya Saat' sütununu seçin.")
+                            st.warning("⚠️ Zaman verisi okunamadı.")
                         else:
                             dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
                             dc.columns = ['Tarih', 'GunlukMesaj']
@@ -249,7 +254,7 @@ if df is not None:
             st.markdown("""
             -  Grup hakkında bana neler söyleyebilirsin?
             -  Grubun genel kişilik analizini çıkarabilir misin?
-            - 🕵️ Grubun gizli lideri kim?
+            -  Grubun en hararetli tartışmasının konusu neydi?
             -  Kimler birbiriyle daha iyi anlaşıyor?
             -  Yakın zamanda planlanan bir etkinlik var mı?
             -  Kasım ayında neler yapılmış?
