@@ -1,8 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import pandas as pd
-import altair as alt
-import plotly.express as px
+import plotly.express as px  # <-- ARTIK TEK KRAL BU
 import os
 import emoji
 from wordcloud import WordCloud
@@ -74,7 +73,7 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "iletişime","adına","okula"
     }
 
-    # --- METİN TEMİZLEME (REGEX İLE LİNK SİLME) ---
+    # --- METİN TEMİZLEME ---
     def metni_temizle(text):
         text = str(text).lower() 
         text = re.sub(r'http\S+', '', text) 
@@ -88,12 +87,12 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
     temiz_seri = df[mesaj_sutunu].dropna().apply(metni_temizle)
     text = " ".join(temiz_seri.tolist())
     
-    # --- WORDCLOUD AYARLARI (KOYU MOD) ---
+    # --- WORDCLOUD ---
     wordcloud = WordCloud(
         width=1600, 
         height=800, 
-        background_color='#0E1117', # Streamlit Koyu Tema Rengi
-        colormap='viridis',         # Yeşil/Mor Neon Renkler
+        background_color='#0E1117',
+        colormap='viridis',
         stopwords=agresif_yasaklar,
         min_font_size=10,
         min_word_length=3,
@@ -104,13 +103,13 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
     return wordcloud
 
 # ---------------------------------------------------------
-# 3. ARAYÜZ VE MENÜ (KVKK İÇİN HAZIR VERİ KALDIRILDI)
+# 3. ARAYÜZ
 # ---------------------------------------------------------
 st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
 
-# Sadece 2 seçenek kaldı:
-secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "🧪 Demo Modu (Yapay Veri)"])
+# KVKK gereği Hazır Veri seti kaldırıldı
+secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "🧪 Demo Modu (Sentetik)"])
 
 df = None
 
@@ -120,16 +119,19 @@ if secim == "📂 Kendi Dosyamı Yükle":
         try: df = pd.read_excel(uploaded_file)
         except Exception as e: st.error(f"Hata: {e}")
 
-elif secim == "🧪 Demo Modu (Yapay Veri)":
+elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
+
+
 
 # ---------------------------------------------------------
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-    # Güvenlik önlemi (İsim maskeleme - Opsiyonel)
+    # İsim Maskeleme (KVKK)
     df = df.replace("Fatih Sarı", "+90 545 655 91 18")
+    
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
@@ -157,33 +159,50 @@ if df is not None:
             st.divider()
 
             g1, g2 = st.columns(2)
+            
+            # --- GRAFİK 1: EN ÇOK YAZANLAR (PLOTLY) ---
             with g1:
                 st.subheader("🏆 En Çok Yazanlar")
                 uc = df[selected_user_col].value_counts().head(10).reset_index()
                 uc.columns = ["Kişi", "Mesaj"]
-                st.altair_chart(alt.Chart(uc).mark_bar().encode(x='Mesaj', y=alt.Y('Kişi', sort='-x'), color=alt.value("#3182bd")).properties(height=350), use_container_width=True)
-            
+                # Plotly Bar Chart
+                fig_users = px.bar(uc, x='Mesaj', y='Kişi', orientation='h', 
+                                   text='Mesaj', color='Mesaj', color_continuous_scale='Blues')
+                fig_users.update_layout(yaxis=dict(autorange="reversed")) # Sıralamayı düzelt
+                st.plotly_chart(fig_users, use_container_width=True)
+
+            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY) ---
             with g2:
                 st.subheader("📊 Zaman Analizi")
                 try:
                     if any(x in selected_date_col.lower() for x in ['saat','time']):
-                        tc = df[selected_date_col].value_counts().head(24).reset_index(); tc.columns=["Saat","Mesaj"]; tc=tc.sort_values("Saat")
-                        st.altair_chart(alt.Chart(tc).mark_bar().encode(x='Saat', y='Mesaj', color=alt.value("orange")).properties(height=350), use_container_width=True)
+                        # Saat Analizi
+                        tc = df[selected_date_col].value_counts().head(24).reset_index()
+                        tc.columns=["Saat","Mesaj"]
+                        tc = tc.sort_values("Saat")
+                        # Plotly Column Chart
+                        fig_time = px.bar(tc, x='Saat', y='Mesaj', color='Mesaj', color_continuous_scale='Oranges')
+                        st.plotly_chart(fig_time, use_container_width=True)
                     else:
+                        # Tarih Analizi
                         d = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
-                        dc = df.groupby(d.dt.date).size().reset_index(name='Mesaj'); dc.columns=['Tarih','Mesaj']
-                        st.altair_chart(alt.Chart(dc).mark_area(line={'color':'darkgreen'}, color=alt.Gradient(gradient='linear', stops=[alt.GradientStop(color='darkgreen', offset=0), alt.GradientStop(color='white', offset=1)], x1=1, x2=1, y1=1, y2=0)).encode(x='Tarih:T', y='Mesaj:Q').properties(height=350), use_container_width=True)
-                except: st.warning("Grafik oluşturulamadı.")
+                        dc = df.groupby(d.dt.date).size().reset_index(name='Mesaj')
+                        dc.columns=['Tarih','Mesaj']
+                        # Plotly Area Chart
+                        fig_date = px.area(dc, x='Tarih', y='Mesaj', line_group=None, color_discrete_sequence=['#2ecc71'])
+                        st.plotly_chart(fig_date, use_container_width=True)
+                except Exception as e: 
+                    st.error(f"Grafik oluşturulamadı: {e}")
 
             st.divider()
 
-            # --- KELİME BULUTU (KOYU MOD) ---
+            # --- KELİME BULUTU ---
             st.markdown("### ☁️ Kelime Bulutu")
             if col_mesaj and col_mesaj in df.columns:
                 try:
                     wc = kelime_bulutu_olustur(df, col_mesaj)
                     fig, ax = plt.subplots(figsize=(12, 6))
-                    fig.patch.set_facecolor('#0E1117') # Dış çerçeve rengi
+                    fig.patch.set_facecolor('#0E1117') 
                     ax.imshow(wc, interpolation='bilinear')
                     ax.axis("off")
                     st.pyplot(fig)
@@ -191,7 +210,7 @@ if df is not None:
             
             st.divider()
 
-            # --- EMOJİ ANALİZİ (PLOTLY) ---
+            # --- EMOJİ ANALİZİ ---
             st.markdown("### 🤩 Emoji Analizi")
             if col_mesaj and col_mesaj in df.columns:
                 all_text = " ".join(df[col_mesaj].dropna().astype(str).tolist())
@@ -224,7 +243,7 @@ if df is not None:
             st.markdown("""
             -  Grup hakkında bana neler söyleyebilirsin?
             -  Grubun genel kişilik analizini çıkarabilir misin?
-            -  Grubun en hararetli tartışması ne hakkındaydı?
+            -  Grubun gizli lideri kim?
             -  Kimler birbiriyle daha iyi anlaşıyor?
             -  Yakın zamanda planlanan bir etkinlik var mı?
             -  Kasım ayında neler yapılmış?
