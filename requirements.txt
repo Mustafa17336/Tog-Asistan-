@@ -2,8 +2,6 @@ streamlit
 pandas
 openpyxl
 google-generativeai
-langchain-community
-langchain-core
-faiss-cpu
-sentence-transformers
+plotly
+
 
