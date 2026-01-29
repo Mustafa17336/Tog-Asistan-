@@ -163,7 +163,7 @@ if df is not None:
             
             # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - SOL GRAFİK) ---
             with g1:
-                st.subheader("🏆 En Çok Yazanlar")
+                st.subheader("📊 Mesaj Frekans Analizi")
                 try:
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
                     uc.columns = ["Deger", "Adet"] 
