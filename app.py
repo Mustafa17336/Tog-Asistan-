@@ -133,7 +133,7 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 # 4. ANALİZ
 # ---------------------------------------------------------
 if df is not None:
-    df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
+    df = df.replace("Fatih Sarı", "+90 545 655 91 18")
     
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
