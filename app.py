@@ -121,12 +121,18 @@ elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
+# --- İMZA ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 👨‍💻 Geliştirici")
+st.sidebar.caption("Bu proje **Gemini 2.5 Flash** altyapısı kullanılarak geliştirilmiştir.")
+st.sidebar.info("**Fatih Sarı**\nMarmara Üniv. İstatistik 📉")
 
 # ---------------------------------------------------------
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-     df = df.replace("Fatih Sarı", "+90 545 655 91 18") <-- 
+    # 🚨 DİKKAT: Burada artık replace veya anonimleştirme kodu YOK.
+    # df = df.replace("Fatih Sarı", "XXX") <-- SİLİNDİ
     
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author','sender'])), cols[0])
@@ -238,12 +244,12 @@ if df is not None:
         st.subheader("💬 Yapay Zeka Asistanı")
         with st.expander("💡 Örnek Sorular", expanded=True):
             st.markdown("""
-            -  Grup hakkında bana neler söyleyebilirsin?
-            -  Grubun genel kişilik analizini çıkarabilir misin?
-            -  Grubun en hararetli tartışmasının konusu neydi?
-            -  Kimler birbiriyle daha iyi anlaşıyor?
-            -  Yakın zamanda planlanan bir etkinlik var mı?
-            -  Kasım ayında neler yapılmış?
+            - 🧐 Grup hakkında bana neler söyleyebilirsin?
+            - 🧠 Grubun genel kişilik analizini çıkarabilir misin?
+            - 🕵️‍♂️ Grubun gizli lideri kim?
+            - 🤝 Kimler birbiriyle daha iyi anlaşıyor?
+            - 📅 Yakın zamanda planlanan bir etkinlik var mı?
+            - 🍂 Kasım ayında neler yapılmış?
             """)
 
         if "messages" not in st.session_state: st.session_state.messages = []
