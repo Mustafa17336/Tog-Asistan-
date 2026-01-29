@@ -7,6 +7,7 @@ import os
 import emoji
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import re # Regex kütüphanesi (Link temizliği için şart)
 
 # ---------------------------------------------------------
 # 1. AYARLAR
@@ -41,10 +42,8 @@ def emojileri_ayikla(text):
     return [item['emoji'] for item in emoji_listesi]
 
 def kelime_bulutu_olustur(df, mesaj_sutunu):
-    text = " ".join(df[mesaj_sutunu].dropna().astype(str).tolist()).lower()
-    
-    # --- DEV YASAKLI KELİME LİSTESİ (AGRESİF TEMİZLİK) ---
-    stopwords = {
+    # --- SENİN GÖNDERDİĞİN AGRESIF YASAKLI LİSTE ---
+    agresif_yasaklar = {
         # Zamirler ve Bağlaçlar
         "bir", "iki", "üç", "ve", "ile", "de", "da", "bu", "şu", "o", "ben", "sen", "biz", "siz", 
         "onlar", "bana", "sana", "bize", "size", "benim", "senin", "bizim", "sizin", "bende", 
@@ -79,16 +78,31 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "arası","şekilde","dedim","istiyorum","isterim","isteyenler","projesi","olması","olurum","aaa","günü","oluyor","olabilir",
         "iletişime","adına","okula"
     }
+
+    # --- SENİN TEMİZLİK FONKSİYONUN ---
+    def metni_temizle(text):
+        text = str(text).lower() 
+        text = re.sub(r'http\S+', '', text) # Linkleri kökten sil
+        text = re.sub(r'www\S+', '', text)
+        text = text.replace("bu mesaj silindi", "") 
+        text = text.replace("<medya dahil edilmedi>", "")
+        text = re.sub(r'[^\w\s]', '', text) # Noktalama işaretlerini sil
+        return text
+
+    # Veriyi temizle
+    temiz_seri = df[mesaj_sutunu].dropna().apply(metni_temizle)
+    text = " ".join(temiz_seri.tolist())
     
-    # Medya mesajlarını metinden de temizle
-    text = text.replace("<medya dahil edilmedi>", "").replace("medya dahil edilmedi", "")
-    
+    # --- SENİN WORDCLOUD AYARLARIN ---
     wordcloud = WordCloud(
-        width=800, height=400,
-        background_color='#0E1117',
-        colormap='Wistia',
-        stopwords=stopwords, # <-- AGRESİF LİSTE BURAYA GELDİ
-        min_font_size=10
+        width=1600, 
+        height=800, 
+        background_color='white', # BEYAZ ARKA PLAN
+        stopwords=agresif_yasaklar,
+        min_font_size=10,
+        min_word_length=3,
+        collocations=False,
+        max_words=100 # En önemli 100 kelime
     ).generate(text)
     
     return wordcloud
@@ -176,8 +190,9 @@ if df is not None:
             if col_mesaj and col_mesaj in df.columns:
                 try:
                     wc = kelime_bulutu_olustur(df, col_mesaj)
-                    fig, ax = plt.subplots(figsize=(10, 5))
-                    ax.imshow(wc, interpolation='bilinear'); ax.axis("off"); fig.patch.set_alpha(0)
+                    fig, ax = plt.subplots(figsize=(12, 6)) # Boyutu biraz büyüttüm
+                    ax.imshow(wc, interpolation='bilinear')
+                    ax.axis("off")
                     st.pyplot(fig)
                 except Exception as e: st.error(f"Hata: {e}")
             
