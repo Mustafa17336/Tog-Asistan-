@@ -229,7 +229,7 @@ if df is not None:
             st.markdown("""
             -  Grup hakkında bana neler söyleyebilirsin?
             -  Grubun genel kişilik analizini çıkarabilir misin?
-            -  Grubun gizli lideri kim?
+            -  En hararetli tartışmanın konusu neydi?
             -  Kimler birbiriyle daha iyi anlaşıyor?
             -  Yakın zamanda planlanan bir etkinlik var mı?
             -  Kasım ayında neler yapılmış?
