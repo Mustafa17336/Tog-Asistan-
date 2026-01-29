@@ -42,7 +42,7 @@ def emojileri_ayikla(text):
     return [item['emoji'] for item in emoji_listesi]
 
 def kelime_bulutu_olustur(df, mesaj_sutunu):
-    # --- AGRESIF YASAKLI LİSTE ---
+    # --- AGRESIF YASAKLI KELİME LİSTESİ ---
     agresif_yasaklar = {
         "bir", "iki", "üç", "ve", "ile", "de", "da", "bu", "şu", "o", "ben", "sen", "biz", "siz", 
         "onlar", "bana", "sana", "bize", "size", "benim", "senin", "bizim", "sizin", "bende", 
@@ -74,7 +74,7 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "iletişime","adına","okula"
     }
 
-    # --- TEMİZLİK FONKSİYONU ---
+    # --- METİN TEMİZLEME (REGEX İLE LİNK SİLME) ---
     def metni_temizle(text):
         text = str(text).lower() 
         text = re.sub(r'http\S+', '', text) 
@@ -92,8 +92,8 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
     wordcloud = WordCloud(
         width=1600, 
         height=800, 
-        background_color='#0E1117', # <-- STREAMLIT KOYU GRİSİ
-        colormap='viridis',         # <-- YEŞİL/MOR NEON TONLAR
+        background_color='#0E1117', # Streamlit Koyu Tema Rengi
+        colormap='viridis',         # Yeşil/Mor Neon Renkler
         stopwords=agresif_yasaklar,
         min_font_size=10,
         min_word_length=3,
@@ -104,11 +104,13 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
     return wordcloud
 
 # ---------------------------------------------------------
-# 3. ARAYÜZ
+# 3. ARAYÜZ VE MENÜ (KVKK İÇİN HAZIR VERİ KALDIRILDI)
 # ---------------------------------------------------------
 st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
-secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "📁 MarmaraTOG WP - Ekim 25 - Ocak 26", "🧪 Demo Modu (Yapay Veri)"])
+
+# Sadece 2 seçenek kaldı:
+secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "🧪 Demo Modu (Yapay Veri)"])
 
 df = None
 
@@ -118,22 +120,15 @@ if secim == "📂 Kendi Dosyamı Yükle":
         try: df = pd.read_excel(uploaded_file)
         except Exception as e: st.error(f"Hata: {e}")
 
-elif secim == "📁 MarmaraTOG WP - Ekim 25 - Ocak 26":
-    dosya_yolu = "ornek_veri.xlsx"
-    if os.path.exists(dosya_yolu):
-        try: df = pd.read_excel(dosya_yolu); st.sidebar.success("✅ Hazır veri yüklendi!")
-        except Exception as e: st.error(f"Hata: {e}")
-    else: st.sidebar.warning("Dosya bulunamadı.")
-
 elif secim == "🧪 Demo Modu (Yapay Veri)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
 # ---------------------------------------------------------
-# 4. ANALİZ
+# 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-    df = df.replace("Fatih Sarı", "+90 545 655 91 18")
+    # Güvenlik önlemi (İsim maskeleme - Opsiyonel)
     
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
@@ -147,6 +142,7 @@ if df is not None:
 
     tab1, tab2 = st.tabs(["📈 İstatistik Paneli", "💬 Yapay Zeka Asistanı"])
 
+    # --- TAB 1: DASHBOARD ---
     with tab1:
         st.markdown("### 🚀 Genel Bakış")
         c1, c2 = st.columns(2)
@@ -181,14 +177,13 @@ if df is not None:
 
             st.divider()
 
-            # --- KELİME BULUTU ---
+            # --- KELİME BULUTU (KOYU MOD) ---
             st.markdown("### ☁️ Kelime Bulutu")
             if col_mesaj and col_mesaj in df.columns:
                 try:
                     wc = kelime_bulutu_olustur(df, col_mesaj)
                     fig, ax = plt.subplots(figsize=(12, 6))
-                    # Arkasını şeffaf yapıp siteye yedirelim
-                    fig.patch.set_facecolor('#0E1117') 
+                    fig.patch.set_facecolor('#0E1117') # Dış çerçeve rengi
                     ax.imshow(wc, interpolation='bilinear')
                     ax.axis("off")
                     st.pyplot(fig)
@@ -196,7 +191,7 @@ if df is not None:
             
             st.divider()
 
-            # --- EMOJİ ANALİZİ ---
+            # --- EMOJİ ANALİZİ (PLOTLY) ---
             st.markdown("### 🤩 Emoji Analizi")
             if col_mesaj and col_mesaj in df.columns:
                 all_text = " ".join(df[col_mesaj].dropna().astype(str).tolist())
@@ -221,21 +216,20 @@ if df is not None:
                         st.markdown(f"<div style='text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 10px;'><h1 style='font-size: 100px; margin: 0;'>{top_emoji}</h1><p style='font-size: 20px; margin-top: 10px;'>{top_count} kez kullanıldı</p></div>", unsafe_allow_html=True)
                 else: st.info("Emoji bulunamadı.")
 
+    # --- TAB 2: ASİSTAN ---
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
         
-        # --- ÖRNEK SORULAR MENÜSÜ ---
         with st.expander("💡 Örnek Sorular", expanded=True):
             st.markdown("""
             -  Grup hakkında bana neler söyleyebilirsin?
             -  Grubun genel kişilik analizini çıkarabilir misin?
-            -  En hararetli tartışmanın konusu neydi?
+            -  Grubun en hararetli tartışması ne hakkındaydı?
             -  Kimler birbiriyle daha iyi anlaşıyor?
             -  Yakın zamanda planlanan bir etkinlik var mı?
             -  Kasım ayında neler yapılmış?
             """)
 
-        # --- CHAT GEÇMİŞİ VE GİRİŞ ---
         if "messages" not in st.session_state: 
             st.session_state.messages = []
 
@@ -249,7 +243,6 @@ if df is not None:
             with st.chat_message("assistant"):
                 with st.spinner("Analiz ediliyor..."):
                     try:
-                        # text_data değişkeni yukarıdaki if bloğundan geliyor
                         full_prompt = f"Veri:\n{text_data}\n\nSoru: {prompt}"
                         response = model.generate_content(full_prompt)
                         st.markdown(response.text)
