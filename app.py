@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import pandas as pd
 import plotly.express as px
+import altair as alt  # <-- ESKİ DOSTUMUZ GERİ GELDİ
 import os
 import emoji
 from wordcloud import WordCloud
@@ -30,7 +31,7 @@ def demo_veri_olustur():
     data = {
         'Tarih': ['01.01.2026']*4 + ['02.01.2026']*4,
         'Saat': ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
-        'Gönderen': ['+90 532 100 20 30']*4 + ['Ayşe']*4, # Numaralı örnek
+        'Gönderen': ['+90 532 100 20 30']*4 + ['Ayşe']*4,
         'Mesaj': ['Selam proje harika 🥳', 'Naber? Toplantı ne zaman? 👍🏻', 'Harika iş çıkardık! 🔥', 'Görüşürüz yarın 👋', 'Toplantı iptal mi?', 'Proje bitti mi?', 'Evet bitti 👍🏻', 'Kutlama yapalım 🥳'],
         'Tip': ['Yazı']*8
     }
@@ -41,7 +42,6 @@ def emojileri_ayikla(text):
     return [item['emoji'] for item in emoji_listesi]
 
 def kelime_bulutu_olustur(df, mesaj_sutunu):
-    # --- AGRESIF YASAKLI KELİME LİSTESİ ---
     agresif_yasaklar = {
         "bir", "iki", "üç", "ve", "ile", "de", "da", "bu", "şu", "o", "ben", "sen", "biz", "siz", 
         "onlar", "bana", "sana", "bize", "size", "benim", "senin", "bizim", "sizin", "bende", 
@@ -131,9 +131,6 @@ st.sidebar.info("**Fatih Sarı**\nMarmara Üniv. İstatistik 📉")
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-    # 🚨 DİKKAT: Burada artık replace veya anonimleştirme kodu YOK.
-    # df = df.replace("Fatih Sarı", "XXX") <-- SİLİNDİ
-    
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author','sender'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
@@ -161,23 +158,24 @@ if df is not None:
 
             g1, g2 = st.columns(2)
             
-            # --- GRAFİK 1: EN ÇOK YAZANLAR (SADECE GERÇEK VERİ) ---
+            # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - ESKİ HALİ) ---
             with g1:
                 st.subheader("🏆 En Çok Yazanlar")
                 try:
-                    # Direkt sütundaki veriyi sayıyoruz, değişiklik yapmadan.
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
-                    uc.columns = ["Kullanici", "MesajSayisi"]
+                    uc.columns = ["Kişi", "Mesaj"] # Sütun isimlerini Altair için hazırladık
                     
-                    # Plotly ile çizim
-                    fig_users = px.bar(uc, x='MesajSayisi', y='Kullanici', orientation='h', 
-                                       text='MesajSayisi', color='MesajSayisi', color_continuous_scale='Blues')
-                    # Sıralamayı en çoktan en aza yap
-                    fig_users.update_layout(yaxis=dict(autorange="reversed"), xaxis_title="Mesaj Sayısı", yaxis_title=None)
-                    st.plotly_chart(fig_users, use_container_width=True)
+                    # İŞTE BU KOD ESKİ SADE HALİ:
+                    chart = alt.Chart(uc).mark_bar().encode(
+                        x='Mesaj', 
+                        y=alt.Y('Kişi', sort='-x'), 
+                        color=alt.value("#3182bd") # O klasik mavi renk
+                    ).properties(height=350)
+                    
+                    st.altair_chart(chart, use_container_width=True)
                 except Exception as e: st.warning(f"Grafik hatası: {e}")
 
-            # --- GRAFİK 2: ZAMAN ANALİZİ ---
+            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY - GÜVENLİ HALİ) ---
             with g2:
                 st.subheader("📊 Zaman Analizi")
                 try:
