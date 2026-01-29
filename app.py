@@ -83,7 +83,7 @@ if uploaded_file:
             with st.chat_message("assistant"):
                 with st.spinner("Analiz yapılıyor..."):
                     try:
-                        full_prompt = f"Veri: {text_data[:80000]}\nSoru: {prompt}"
+                        full_prompt = f"Veri: {text_data[:25000]}\nSoru: {prompt}"
                         response = model.generate_content(full_prompt)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
