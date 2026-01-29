@@ -121,12 +121,6 @@ elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
-# --- İMZA ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 👨‍💻 Geliştirici")
-st.sidebar.caption("Bu proje **Gemini 2.5 Flash** altyapısı kullanılarak geliştirilmiştir.")
-st.sidebar.info("**Fatih Sarı**\nMarmara Üniv. İstatistik 📉")
-
 # ---------------------------------------------------------
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
