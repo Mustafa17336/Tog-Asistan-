@@ -22,7 +22,7 @@ def gemini_ayarla():
 model = gemini_ayarla()
 
 # ---------------------------------------------------------
-# 2. YARDIMCI FONKSİYONLAR (EMOJİ BULUCU) 🕵️‍♂️
+# 2. YARDIMCI FONKSİYONLAR
 # ---------------------------------------------------------
 def demo_veri_olustur():
     data = {
@@ -35,9 +35,16 @@ def demo_veri_olustur():
     return pd.DataFrame(data)
 
 def emojileri_ayikla(text):
-    # Yaygın emoji aralıklarını kapsayan Regex
+    # Regex ile emojileri bul
     emoji_pattern = re.compile(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002600-\U000026FF\U00002700-\U000027BF]', flags=re.UNICODE)
-    return emoji_pattern.findall(str(text))
+    found = emoji_pattern.findall(str(text))
+    
+    # FİLTRE: Bozuk karakterleri, ten rengi kodlarını ve geometrik şekilleri at
+    # Bu liste, ekran görüntüsündeki o "kare" şekli gibi gereksizleri engeller.
+    yasakli_liste = ['🏻', '🏼', '🏽', '🏾', '🏿', '♂️', '♀️', '⃣', '️', '⃣', '〰', '▪', '▫', '▶', '◀', '◻', '◼', '◾', '◽']
+    
+    temiz_emojiler = [e for e in found if e not in yasakli_liste]
+    return temiz_emojiler
 
 # ---------------------------------------------------------
 # 3. ARAYÜZ VE VERİ SEÇİMİ
@@ -71,15 +78,17 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-    df = df.replace("Fatih Sarı", "+90 545 655 91 18")
+    df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
     
-    # Otomatik Sütun Tahminleri
+    # Sütunları Otomatik Bul
     cols = df.columns
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
-    col_mesaj = next((c for c in cols if any(x in c.lower() for x in ['mesaj','message','icerik','text'])), None)
+    
+    # Mesaj Sütunu (Öncelikli olarak 'Mesaj' veya 'Message' ara, yoksa en son sütunu al)
+    col_mesaj = next((c for c in cols if any(x in c.lower() for x in ['mesaj','message','icerik','text'])), cols[-1])
 
-    # Chat Verisi Hazırlığı
+    # Chat Verisi
     chat_df = df.iloc[::-1]
     text_data = ""
     for index, row in chat_df.head(3000).iterrows():
@@ -95,7 +104,6 @@ if df is not None:
         with c2: selected_date_col = st.selectbox("Zaman Sütunu:", cols, index=cols.get_loc(col_tarih))
 
         if selected_user_col and selected_date_col:
-            # Metrikler
             total_msgs = len(df)
             top_user = df[selected_user_col].mode()[0] if not df[selected_user_col].mode().empty else "Yok"
             
@@ -106,7 +114,6 @@ if df is not None:
             
             st.divider()
 
-            # Grafikler (Üst Satır)
             g1, g2 = st.columns(2)
             
             with g1:
@@ -142,15 +149,12 @@ if df is not None:
 
             st.divider()
 
-            # --- EMOJİ ANALİZİ BÖLÜMÜ (YENİ) ---
+            # --- EMOJİ ANALİZİ (OTOMATİK VE FİLTRELİ) ---
             st.markdown("### 🤩 Emoji Analizi")
             
-            # Mesaj sütununu kullanıcıya teyit ettirelim
-            col_msg_select = st.selectbox("Mesajların olduğu sütun (Emoji taraması için):", cols, index=cols.get_loc(col_mesaj) if col_mesaj else 0)
-
-            if col_msg_select:
-                # Tüm mesajları birleştir ve emojileri bul
-                all_text = " ".join(df[col_msg_select].dropna().astype(str).tolist())
+            # Artık kullanıcıya sütun sormuyoruz, 'col_mesaj'ı kullanıyoruz.
+            if col_mesaj and col_mesaj in df.columns:
+                all_text = " ".join(df[col_mesaj].dropna().astype(str).tolist())
                 found_emojis = emojileri_ayikla(all_text)
 
                 if found_emojis:
@@ -161,7 +165,6 @@ if df is not None:
                     
                     with e1:
                         st.subheader("En Çok Kullanılan Emojiler")
-                        # Bar Chart
                         e_chart = alt.Chart(emoji_df).mark_bar().encode(
                             x=alt.X('Adet', title='Kullanım Sayısı'),
                             y=alt.Y('Emoji', sort='-x', title=None),
@@ -169,7 +172,6 @@ if df is not None:
                             tooltip=['Emoji', 'Adet']
                         ).properties(height=400)
                         
-                        # Barların ucuna sayı yazdırma
                         text = e_chart.mark_text(align='left', dx=2).encode(text='Adet')
                         st.altair_chart(e_chart + text, use_container_width=True)
                     
@@ -177,17 +179,27 @@ if df is not None:
                         st.subheader("Lider Emoji 👑")
                         top_emoji = emoji_df.iloc[0]['Emoji']
                         top_count = emoji_df.iloc[0]['Adet']
-                        st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{top_emoji}</h1>", unsafe_allow_html=True)
-                        st.markdown(f"<p style='text-align: center;'>Toplam <b>{top_count}</b> kez kullanıldı.</p>", unsafe_allow_html=True)
+                        
+                        # Emojiyi grafik yerine HTML olarak basıyoruz (Daha düzgün görünür)
+                        st.markdown(
+                            f"""
+                            <div style='text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 10px;'>
+                                <h1 style='font-size: 100px; margin: 0;'>{top_emoji}</h1>
+                                <p style='font-size: 20px; margin-top: 10px;'>{top_count} kez kullanıldı</p>
+                            </div>
+                            """, 
+                            unsafe_allow_html=True
+                        )
                 else:
-                    st.info("Bu sohbette hiç emoji bulunamadı. 😐")
-
+                    st.info("Bu sohbette (veya seçilen sütunda) hiç emoji bulunamadı. 😐")
+            else:
+                st.warning("Mesaj sütunu otomatik tespit edilemedi.")
 
     # --- TAB 2: ASİSTAN ---
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
         with st.expander("💡 Örnek Sorular", expanded=True):
-            st.markdown("-  Bu grubun genel amacı ne?\n-  En hararetli tartışma neydi?\n-  En komik anları özetle.\n-  Grubun 'gizli lideri' kim?")
+            st.markdown("- 🧐 Bu grubun genel amacı ne?\n- 🔥 En hararetli tartışma neydi?\n- 😂 En komik anları özetle.\n- 🏆 Grubun 'gizli lideri' kim?")
         
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
