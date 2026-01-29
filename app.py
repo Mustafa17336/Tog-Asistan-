@@ -4,10 +4,8 @@ import pandas as pd
 
 st.set_page_config(page_title="MarmaraTOG Asistanı", page_icon="🤖", layout="wide")
 
-# ---------------------------------------------------------
-# MODEL SEÇİMİ (GARANTİLİ LİSTE YÖNTEMİ)
-# ---------------------------------------------------------
 def gemini_ayarla():
+    # 1. API Anahtarını Al
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
     else:
@@ -20,36 +18,34 @@ def gemini_ayarla():
     genai.configure(api_key=api_key)
     
     try:
-        # Google'dan o an MÜSAİT olan modelleri çekiyoruz
+        # 2. Tüm Modelleri Listele ve Kullanıcıya Seçtir
         uygun_modeller = []
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 uygun_modeller.append(m.name)
         
-        secilen_model = None
+        # Eğer liste boşsa hata ver
+        if not uygun_modeller:
+            st.error("API anahtarınızla erişilebilen hiçbir model bulunamadı.")
+            st.stop()
 
-        # 1. ÖNCELİK: Listede isminde "1.5-flash" geçen İLK model
-        # (Örn: models/gemini-1.5-flash-001 veya models/gemini-1.5-flash-latest)
-        for m in uygun_modeller:
-            if "1.5-flash" in m:
-                secilen_model = m
+        # Varsayılan olarak 1.5-flash'ı bulmaya çalış (Seçili gelmesi için)
+        varsayilan_index = 0
+        for i, model_adi in enumerate(uygun_modeller):
+            if "1.5-flash" in model_adi:
+                varsayilan_index = i
                 break
-        
-        # 2. ÖNCELİK: Eğer 1.5 yoksa, herhangi bir "flash"
-        if not secilen_model:
-            for m in uygun_modeller:
-                if "flash" in m:
-                    secilen_model = m
-                    break
 
-        # 3. GÜVENLİK AĞI: Hiçbiri yoksa listedeki ilk modeli al (Asla 404 vermez)
-        if not secilen_model and uygun_modeller:
-            secilen_model = uygun_modeller[0]
-
-        # KANIT: Seçilen resmi ismi ekrana yaz
-        st.sidebar.success(f"✅ Çalışan Model: {secilen_model}")
+        # KULLANICI SEÇİMİ (Artık patron sensin)
+        secilen_model_adi = st.sidebar.selectbox(
+            "Kullanılacak Modeli Seçiniz:",
+            uygun_modeller,
+            index=varsayilan_index
+        )
         
-        return genai.GenerativeModel(secilen_model)
+        st.sidebar.success(f"✅ Şu an Seçili: {secilen_model_adi}")
+        
+        return genai.GenerativeModel(secilen_model_adi)
 
     except Exception as e:
         st.error(f"Bağlantı hatası: {e}")
@@ -58,7 +54,7 @@ def gemini_ayarla():
 model = gemini_ayarla()
 
 st.title("🤖 MarmaraTOG WhatsApp Asistanı")
-st.markdown("Bu asistan, yüklediğiniz WhatsApp geçmişini analiz eder ve sorularınızı cevaplar.")
+st.markdown("Bu asistan, yüklediğiniz WhatsApp geçmişini analiz eder.")
 
 uploaded_file = st.sidebar.file_uploader("WhatsApp Excel Dosyasını Yükle", type=["xlsx", "xls"])
 
@@ -92,7 +88,7 @@ if uploaded_file:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                     except Exception as e:
-                        st.error(f"Cevap üretilirken hata: {e}")
+                        st.error(f"Hata: {e}")
     except Exception as e:
         st.error(f"Dosya okuma hatası: {e}")
 else:
