@@ -108,7 +108,7 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
 # ---------------------------------------------------------
 st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
-secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "📁 Hazır Veri Seti (Gerçek)", "🧪 Demo Modu (Sentetik)"])
+secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "📁 MarmaraTOG WP - Ekim 25 - Ocak 26", "🧪 Demo Modu (Yapay Veri)"])
 
 df = None
 
@@ -118,14 +118,14 @@ if secim == "📂 Kendi Dosyamı Yükle":
         try: df = pd.read_excel(uploaded_file)
         except Exception as e: st.error(f"Hata: {e}")
 
-elif secim == "📁 Hazır Veri Seti (Gerçek)":
+elif secim == "📁 MarmaraTOG WP - Ekim 25 - Ocak 26":
     dosya_yolu = "ornek_veri.xlsx"
     if os.path.exists(dosya_yolu):
         try: df = pd.read_excel(dosya_yolu); st.sidebar.success("✅ Hazır veri yüklendi!")
         except Exception as e: st.error(f"Hata: {e}")
     else: st.sidebar.warning("Dosya bulunamadı.")
 
-elif secim == "🧪 Demo Modu (Sentetik)":
+elif secim == "🧪 Demo Modu (Yapay Veri)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
