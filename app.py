@@ -30,12 +30,11 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file)
         
         # --- OTOMATİK SÜTUN TAHMİNİ ---
-        # Tahmin etmeye çalış, bulamazsan ilk sütunu al
         tahmini_isim_sutunu = next((col for col in df.columns if "onderen" in col.lower() or "ender" in col.lower() or "author" in col.lower()), df.columns[0])
         tahmini_tarih_sutunu = next((col for col in df.columns if "arih" in col.lower() or "date" in col.lower() or "ime" in col.lower()), df.columns[1] if len(df.columns) > 1 else df.columns[0])
 
         # Veriyi Hazırla (Chat için)
-        chat_df = df.iloc[::-1] # Eskiden yeniye
+        chat_df = df.iloc[::-1]
         text_data = ""
         for index, row in chat_df.iterrows():
             text_data += " | ".join([str(val) for val in row.values]) + "\n"
@@ -43,19 +42,20 @@ if uploaded_file:
         # -----------------------------------------------------
         # SEKME YAPISI
         # -----------------------------------------------------
-        tab1, tab2 = st.tabs(["📈 İstatistik Paneli (Dashboard)", "💬 Yapay Zeka Asistanı"])
+        tab1, tab2 = st.tabs(["📈 İstatistik Paneli", "💬 Yapay Zeka Asistanı"])
 
-        # --- TAB 1: DASHBOARD (DİNAMİK ETİKETLİ) ---
+        # --- TAB 1: DASHBOARD ---
         with tab1:
             st.markdown("### 🚀 Genel Bakış")
             
             col_sel1, col_sel2 = st.columns(2)
             with col_sel1:
-                author_col = st.selectbox("👤 İsimlerin olduğu sütun:", df.columns, index=df.columns.get_loc(tahmini_isim_sutunu))
+                author_col = st.selectbox("👤 İsim Sütunu:", df.columns, index=df.columns.get_loc(tahmini_isim_sutunu))
             with col_sel2:
-                date_col = st.selectbox("📅 Tarihlerin olduğu sütun:", df.columns, index=df.columns.get_loc(tahmini_tarih_sutunu))
+                # Buraya artık "Analiz Sütunu" diyelim, çünkü Saat de seçilebilir
+                date_col = st.selectbox("📅 Tarih/Zaman Sütunu:", df.columns, index=df.columns.get_loc(tahmini_tarih_sutunu))
 
-            # --- METRİK KARTLARI ---
+            # --- METRİKLER ---
             if author_col and date_col:
                 total_msgs = len(df)
                 total_users = df[author_col].nunique()
@@ -63,55 +63,79 @@ if uploaded_file:
                 
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Toplam Mesaj", f"{total_msgs}")
-                m2.metric("Aktif Kişi Sayısı", f"{total_users}")
-                m3.metric("Grup Lideri", f"{top_user}")
+                m2.metric("Aktif Kişi", f"{total_users}")
+                m3.metric("Lider", f"{top_user}")
                 
                 st.divider()
 
-                # --- GRAFİKLER ---
                 g1, g2 = st.columns(2)
 
-                # Grafik 1: En Çok Konuşanlar (DİNAMİK ETİKET)
+                # GRAFİK 1: KİŞİLER (YATAY BAR)
                 with g1:
-                    st.subheader("🏆 En Çok Konuşan İlk 10")
-                    
-                    # Veriyi hazırla ama sütun ismini DEĞİŞTİRME, kullanıcının seçtiği kalsın
+                    st.subheader(f"🏆 {author_col} - İlk 10")
                     user_counts = df[author_col].value_counts().head(10).reset_index()
-                    user_counts.columns = [author_col, "Mesaj Sayısı"] # Dinamik İsim + Sabit Sayaç
+                    user_counts.columns = [author_col, "Mesaj Sayısı"]
                     
                     chart = alt.Chart(user_counts).mark_bar().encode(
                         x=alt.X('Mesaj Sayısı', title='Mesaj Adedi'), 
-                        y=alt.Y(author_col, sort='-x', title=author_col), # <-- BURASI ARTIK DİNAMİK (Seçilen sütun adı yazar)
+                        y=alt.Y(author_col, sort='-x', title=None),
                         tooltip=[author_col, 'Mesaj Sayısı'],
-                        color=alt.value("#3182bd") # Tek renk daha şık durur
+                        color=alt.value("#3182bd")
                     ).properties(height=400)
-                    
                     st.altair_chart(chart, use_container_width=True)
 
-                # Grafik 2: Zaman Çizelgesi (TEMİZ ETİKET)
+                # GRAFİK 2: AKILLI ZAMAN GRAFİĞİ (Area veya Bar)
                 with g2:
-                    st.subheader("📅 Mesaj Yoğunluğu")
-                    try:
-                        df["ParsedDate"] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
-                        daily_counts = df.groupby(df["ParsedDate"].dt.date).size().reset_index(name='Mesaj')
-                        
-                        chart2 = alt.Chart(daily_counts).mark_area(
-                            line={'color':'darkgreen'},
-                            color=alt.Gradient(
-                                gradient='linear',
-                                stops=[alt.GradientStop(color='darkgreen', offset=0),
-                                       alt.GradientStop(color='white', offset=1)],
-                                x1=1, x2=1, y1=1, y2=0
-                            )
-                        ).encode(
-                            x=alt.X('ParsedDate:T', title='Tarih'), # "ParsedDate" yazısı yerine "Tarih" yazacak
-                            y=alt.Y('Mesaj:Q', title='Günlük Mesaj Sayısı'),
-                            tooltip=[alt.Tooltip('ParsedDate:T', title='Tarih', format='%d %B %Y'), 'Mesaj']
+                    st.subheader(f"📊 {date_col} Analizi")
+                    
+                    # --- AKILLI KARAR MEKANİZMASI ---
+                    # Eğer sütun adında "Saat" veya "Time" varsa -> BAR GRAFİĞİ (Dağılım) yap
+                    is_time_column = "saat" in date_col.lower() or "time" in date_col.lower()
+                    
+                    if is_time_column:
+                        # --- SENARYO A: SAAT ANALİZİ (BAR CHART) ---
+                        # En yoğun saatleri göster
+                        time_counts = df[date_col].value_counts().head(20).reset_index()
+                        time_counts.columns = [date_col, "Mesaj Sayısı"]
+                        # Sıralama yap (Saat olduğu için string sort genelde doğru çalışır: 09:00, 10:00...)
+                        time_counts = time_counts.sort_values(by=date_col)
+
+                        chart2 = alt.Chart(time_counts).mark_bar().encode(
+                            x=alt.X(date_col, title=date_col, sort=None), # X eksenine saati koy
+                            y=alt.Y('Mesaj Sayısı', title='Mesaj Sayısı'),
+                            color=alt.value("orange"),
+                            tooltip=[date_col, 'Mesaj Sayısı']
                         ).properties(height=400)
-                        
                         st.altair_chart(chart2, use_container_width=True)
-                    except:
-                        st.warning("Tarih formatı grafiğe çevrilemedi.")
+                    
+                    else:
+                        # --- SENARYO B: TARİH ANALİZİ (AREA CHART - ESKİSİ GİBİ) ---
+                        try:
+                            df["ParsedDate"] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
+                            # Geçersiz tarihleri at (NaT)
+                            valid_dates = df.dropna(subset=["ParsedDate"])
+                            
+                            if not valid_dates.empty:
+                                daily_counts = valid_dates.groupby(valid_dates["ParsedDate"].dt.date).size().reset_index(name='Mesaj')
+                                
+                                chart2 = alt.Chart(daily_counts).mark_area(
+                                    line={'color':'darkgreen'},
+                                    color=alt.Gradient(
+                                        gradient='linear',
+                                        stops=[alt.GradientStop(color='darkgreen', offset=0),
+                                               alt.GradientStop(color='white', offset=1)],
+                                        x1=1, x2=1, y1=1, y2=0
+                                    )
+                                ).encode(
+                                    x=alt.X('ParsedDate:T', title='Tarih'),
+                                    y=alt.Y('Mesaj:Q', title='Günlük Mesaj'),
+                                    tooltip=[alt.Tooltip('ParsedDate:T', format='%d %B %Y'), 'Mesaj']
+                                ).properties(height=400)
+                                st.altair_chart(chart2, use_container_width=True)
+                            else:
+                                st.warning("Bu sütunda geçerli tarih verisi bulunamadı.")
+                        except:
+                            st.warning("Veri grafiğe dökülemedi.")
 
         # --- TAB 2: AI ASİSTAN ---
         with tab2:
@@ -143,4 +167,4 @@ if uploaded_file:
         st.error(f"Dosya işlenirken hata oluştu: {e}")
 
 else:
-    st.info("👈 Analiz için lütfen Excel dosyanızı yükleyin.")
+    st.info("👈 Excel dosyasını yükleyin.")
