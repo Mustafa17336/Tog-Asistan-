@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import pandas as pd
 import plotly.express as px
-import altair as alt  # <-- ESKİ DOSTUMUZ GERİ GELDİ
+import altair as alt
 import os
 import emoji
 from wordcloud import WordCloud
@@ -158,24 +158,24 @@ if df is not None:
 
             g1, g2 = st.columns(2)
             
-            # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - ESKİ HALİ) ---
+            # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - DİNAMİK BAŞLIKLI) ---
             with g1:
                 st.subheader("🏆 En Çok Yazanlar")
                 try:
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
-                    uc.columns = ["Kişi", "Mesaj"] # Sütun isimlerini Altair için hazırladık
+                    uc.columns = ["Deger", "Adet"] # Sütun isimlerini sabitledik (Altair hata vermesin diye)
                     
-                    # İŞTE BU KOD ESKİ SADE HALİ:
                     chart = alt.Chart(uc).mark_bar().encode(
-                        x='Mesaj', 
-                        y=alt.Y('Kişi', sort='-x'), 
-                        color=alt.value("#3182bd") # O klasik mavi renk
+                        x=alt.X('Adet', title='Mesaj Sayısı'), 
+                        y=alt.Y('Deger', sort='-x', title=selected_user_col), # <-- BURASI ARTIK DİNAMİK!
+                        color=alt.value("#3182bd"),
+                        tooltip=[alt.Tooltip('Deger', title=selected_user_col), alt.Tooltip('Adet', title='Mesaj')]
                     ).properties(height=350)
                     
                     st.altair_chart(chart, use_container_width=True)
                 except Exception as e: st.warning(f"Grafik hatası: {e}")
 
-            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY - GÜVENLİ HALİ) ---
+            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY) ---
             with g2:
                 st.subheader("📊 Zaman Analizi")
                 try:
