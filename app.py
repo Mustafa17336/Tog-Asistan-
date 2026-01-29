@@ -45,11 +45,10 @@ if uploaded_file:
         # -----------------------------------------------------
         tab1, tab2 = st.tabs(["📈 İstatistik Paneli (Dashboard)", "💬 Yapay Zeka Asistanı"])
 
-        # --- TAB 1: DASHBOARD (YENİLENDİ) ---
+        # --- TAB 1: DASHBOARD (DİNAMİK ETİKETLİ) ---
         with tab1:
             st.markdown("### 🚀 Genel Bakış")
             
-            # Kullanıcıya yine de seçtirelim ama varsayılanı akıllı olsun
             col_sel1, col_sel2 = st.columns(2)
             with col_sel1:
                 author_col = st.selectbox("👤 İsimlerin olduğu sütun:", df.columns, index=df.columns.get_loc(tahmini_isim_sutunu))
@@ -62,37 +61,37 @@ if uploaded_file:
                 total_users = df[author_col].nunique()
                 top_user = df[author_col].mode()[0]
                 
-                # Yan yana 3 kutu
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Toplam Mesaj", f"{total_msgs}")
                 m2.metric("Aktif Kişi Sayısı", f"{total_users}")
-                m3.metric("Grup Lideri (En Çok Yazan)", f"{top_user}")
+                m3.metric("Grup Lideri", f"{top_user}")
                 
                 st.divider()
 
                 # --- GRAFİKLER ---
                 g1, g2 = st.columns(2)
 
-                # Grafik 1: En Çok Konuşanlar (YATAY BAR)
+                # Grafik 1: En Çok Konuşanlar (DİNAMİK ETİKET)
                 with g1:
                     st.subheader("🏆 En Çok Konuşan İlk 10")
-                    user_counts = df[author_col].value_counts().head(10).reset_index()
-                    user_counts.columns = ["Kişi", "Mesaj Sayısı"]
                     
-                    # Altair ile daha şık grafik
+                    # Veriyi hazırla ama sütun ismini DEĞİŞTİRME, kullanıcının seçtiği kalsın
+                    user_counts = df[author_col].value_counts().head(10).reset_index()
+                    user_counts.columns = [author_col, "Mesaj Sayısı"] # Dinamik İsim + Sabit Sayaç
+                    
                     chart = alt.Chart(user_counts).mark_bar().encode(
-                        x='Mesaj Sayısı',
-                        y=alt.Y('Kişi', sort='-x'),
-                        color='Mesaj Sayısı',
-                        tooltip=['Kişi', 'Mesaj Sayısı']
+                        x=alt.X('Mesaj Sayısı', title='Mesaj Adedi'), 
+                        y=alt.Y(author_col, sort='-x', title=author_col), # <-- BURASI ARTIK DİNAMİK (Seçilen sütun adı yazar)
+                        tooltip=[author_col, 'Mesaj Sayısı'],
+                        color=alt.value("#3182bd") # Tek renk daha şık durur
                     ).properties(height=400)
+                    
                     st.altair_chart(chart, use_container_width=True)
 
-                # Grafik 2: Zaman Çizelgesi (AREA CHART)
+                # Grafik 2: Zaman Çizelgesi (TEMİZ ETİKET)
                 with g2:
                     st.subheader("📅 Mesaj Yoğunluğu")
                     try:
-                        # Tarihleri düzgün parse et (Day First = Türkiye standardı)
                         df["ParsedDate"] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
                         daily_counts = df.groupby(df["ParsedDate"].dt.date).size().reset_index(name='Mesaj')
                         
@@ -105,10 +104,11 @@ if uploaded_file:
                                 x1=1, x2=1, y1=1, y2=0
                             )
                         ).encode(
-                            x='ParsedDate:T',
-                            y='Mesaj:Q',
-                            tooltip=['ParsedDate', 'Mesaj']
+                            x=alt.X('ParsedDate:T', title='Tarih'), # "ParsedDate" yazısı yerine "Tarih" yazacak
+                            y=alt.Y('Mesaj:Q', title='Günlük Mesaj Sayısı'),
+                            tooltip=[alt.Tooltip('ParsedDate:T', title='Tarih', format='%d %B %Y'), 'Mesaj']
                         ).properties(height=400)
+                        
                         st.altair_chart(chart2, use_container_width=True)
                     except:
                         st.warning("Tarih formatı grafiğe çevrilemedi.")
