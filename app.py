@@ -41,6 +41,7 @@ def emojileri_ayikla(text):
     return [item['emoji'] for item in emoji_listesi]
 
 def kelime_bulutu_olustur(df, mesaj_sutunu):
+    # --- AGRESIF YASAKLI KELİME LİSTESİ ---
     agresif_yasaklar = {
         "bir", "iki", "üç", "ve", "ile", "de", "da", "bu", "şu", "o", "ben", "sen", "biz", "siz", 
         "onlar", "bana", "sana", "bize", "size", "benim", "senin", "bizim", "sizin", "bende", 
@@ -72,6 +73,7 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         "iletişime","adına","okula"
     }
 
+    # --- METİN TEMİZLEME ---
     def metni_temizle(text):
         text = str(text).lower() 
         text = re.sub(r'http\S+', '', text) 
@@ -81,12 +83,14 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
         text = re.sub(r'[^\w\s]', '', text) 
         return text
 
+    # Veriyi temizle
     temiz_seri = df[mesaj_sutunu].dropna().apply(metni_temizle)
     text = " ".join(temiz_seri.tolist())
     
     if not text.strip():
         return None
 
+    # --- WORDCLOUD ---
     wordcloud = WordCloud(
         width=1600, 
         height=800, 
@@ -107,6 +111,7 @@ def kelime_bulutu_olustur(df, mesaj_sutunu):
 st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
 
+# Sadece 2 seçenek kaldı:
 secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "🧪 Demo Modu (Sentetik)"])
 
 df = None
@@ -121,23 +126,21 @@ elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
+
 # ---------------------------------------------------------
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
-    # KVKK: İsim Maskeleme
-    df = df.replace("Fatih Sarı", "545 655 91 18")
+    # ❌ İSİM MASKELEME İPTAL EDİLDİ - VERİ OLDUĞU GİBİ GELECEK
+    # df = df.replace("Fatih Sarı", "545 655 91 18")  <-- BU SATIR KALDIRILDI
     
     # Otomatik Sütun Tahmini
     cols = df.columns
-    # Gönderen sütunu için 'onderen', 'sender', 'author' ara
     col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author','sender'])), cols[0])
-    # Tarih sütunu için 'tarih', 'date', 'time' ara
     col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
-    # Mesaj sütunu için 'mesaj', 'message', 'text' ara
     col_mesaj = next((c for c in cols if any(x in c.lower() for x in ['mesaj','message','icerik','text'])), cols[-1])
 
-    # Chat formatı için ters çevir
+    # Chat formatı için
     chat_df = df.iloc[::-1]
     text_data = ""
     for index, row in chat_df.head(3000).iterrows():
@@ -149,8 +152,6 @@ if df is not None:
     with tab1:
         st.markdown("### 🚀 Genel Bakış")
         c1, c2 = st.columns(2)
-        
-        # Kullanıcıya seçim şansı veriyoruz ama varsayılanları akıllı seçtik
         with c1: selected_user_col = st.selectbox("Kişi Sütunu (Örn: Gönderen):", cols, index=cols.get_loc(col_isim))
         with c2: selected_date_col = st.selectbox("Zaman Sütunu (Örn: Tarih/Saat):", cols, index=cols.get_loc(col_tarih))
 
@@ -169,48 +170,42 @@ if df is not None:
 
             g1, g2 = st.columns(2)
             
-            # --- GRAFİK 1: EN ÇOK YAZANLAR ---
+            # --- GRAFİK 1: EN ÇOK YAZANLAR (SANSÜRSÜZ LİSTE) ---
             with g1:
                 st.subheader("🏆 En Çok Yazanlar")
                 try:
-                    # Veriyi hazırla ve sütun isimlerini temizle (Çakışmayı önler)
+                    # En çok mesaj atan 10 kişiyi (veya numarayı) olduğu gibi alıyoruz
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
-                    uc.columns = ["Kullanici", "MesajSayisi"] # <-- İSİMLERİ GARANTİYE ALDIK
+                    uc.columns = ["Kullanici", "MesajSayisi"] 
                     
                     fig_users = px.bar(uc, x='MesajSayisi', y='Kullanici', orientation='h', 
                                        text='MesajSayisi', color='MesajSayisi', color_continuous_scale='Blues')
                     fig_users.update_layout(yaxis=dict(autorange="reversed"), xaxis_title="Mesaj Sayısı", yaxis_title="Kişi")
                     st.plotly_chart(fig_users, use_container_width=True)
                 except Exception as e:
-                    st.warning(f"Kişi grafiği oluşturulamadı. Lütfen 'Gönderen' sütununu seçtiğinizden emin olun.\nHata: {e}")
+                    st.warning(f"Kişi grafiği oluşturulamadı.\nHata: {e}")
 
             # --- GRAFİK 2: ZAMAN ANALİZİ ---
             with g2:
                 st.subheader("📊 Zaman Analizi")
                 try:
-                    # 1. Senaryo: Saat verisi mi?
                     if any(x in selected_date_col.lower() for x in ['saat','time','hour']):
                         tc = df[selected_date_col].value_counts().head(24).reset_index()
                         tc.columns = ["Saat", "Adet"]
                         tc = tc.sort_values("Saat")
                         fig_time = px.bar(tc, x='Saat', y='Adet', color='Adet', color_continuous_scale='Oranges')
                         st.plotly_chart(fig_time, use_container_width=True)
-                    
-                    # 2. Senaryo: Tarih verisi mi?
                     else:
-                        # Tarih formatına çevirmeyi dene
                         d = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
-                        
                         if d.empty:
-                            st.warning("⚠️ Seçilen sütunda geçerli tarih verisi bulunamadı. Lütfen 'Tarih' sütununu seçin.")
+                            st.warning("⚠️ Tarih verisi bulunamadı.")
                         else:
                             dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
                             dc.columns = ['Tarih', 'GunlukMesaj']
                             fig_date = px.area(dc, x='Tarih', y='GunlukMesaj', line_group=None, color_discrete_sequence=['#2ecc71'])
                             st.plotly_chart(fig_date, use_container_width=True)
                             
-                except Exception as e: 
-                    st.error(f"Zaman grafiği hatası: {e}")
+                except Exception as e: st.error(f"Zaman grafiği hatası: {e}")
 
             st.divider()
 
@@ -225,8 +220,7 @@ if df is not None:
                         ax.imshow(wc, interpolation='bilinear')
                         ax.axis("off")
                         st.pyplot(fig)
-                    else:
-                        st.info("Kelime bulutu için yeterli veri yok.")
+                    else: st.info("Kelime bulutu için veri yok.")
                 except Exception as e: st.error(f"Hata: {e}")
             
             st.divider()
@@ -255,8 +249,8 @@ if df is not None:
                             top_count = emoji_df.iloc[0]['Adet']
                             st.subheader("Lider Emoji 👑")
                             st.markdown(f"<div style='text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 10px;'><h1 style='font-size: 100px; margin: 0;'>{top_emoji}</h1><p style='font-size: 20px; margin-top: 10px;'>{top_count} kez kullanıldı</p></div>", unsafe_allow_html=True)
-                    else: st.info("Bu sohbette hiç emoji bulunamadı.")
-                except Exception as e: st.error(f"Emoji analizi hatası: {e}")
+                    else: st.info("Emoji bulunamadı.")
+                except Exception as e: st.error(f"Emoji hatası: {e}")
 
     # --- TAB 2: ASİSTAN ---
     with tab2:
