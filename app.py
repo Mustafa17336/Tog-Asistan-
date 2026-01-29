@@ -4,7 +4,9 @@ import pandas as pd
 import altair as alt
 import plotly.express as px
 import os
-import emoji  # <-- YENİ UZMAN KÜTÜPHANE
+import emoji
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------
 # 1. AYARLAR
@@ -29,18 +31,67 @@ def demo_veri_olustur():
         'Tarih': ['01.01.2026']*4 + ['02.01.2026']*4,
         'Saat': ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
         'Gönderen': ['Ali']*4 + ['Ayşe']*4,
-        'Mesaj': ['Selam 🥳', 'Naber? 👍🏻', 'Harika! 🔥', 'Görüşürüz 👋', '🥳🥳', '🔥', '👍🏻', '🥳'],
+        'Mesaj': ['Selam proje harika 🥳', 'Naber? Toplantı ne zaman? 👍🏻', 'Harika iş çıkardık! 🔥', 'Görüşürüz yarın 👋', 'Toplantı iptal mi?', 'Proje bitti mi?', 'Evet bitti 👍🏻', 'Kutlama yapalım 🥳'],
         'Tip': ['Yazı']*8
     }
     return pd.DataFrame(data)
 
 def emojileri_ayikla(text):
-    # 'emoji' kütüphanesi ile metindeki TÜM emojileri liste olarak al
-    # emoji_list fonksiyonu metindeki her bir emojiyi {emoji: '🥳', ...} formatında döndürür
     emoji_listesi = emoji.emoji_list(str(text))
-    # Sadece emoji karakterlerini çek
-    sadece_emojiler = [item['emoji'] for item in emoji_listesi]
-    return sadece_emojiler
+    return [item['emoji'] for item in emoji_listesi]
+
+def kelime_bulutu_olustur(df, mesaj_sutunu):
+    text = " ".join(df[mesaj_sutunu].dropna().astype(str).tolist()).lower()
+    
+    # --- DEV YASAKLI KELİME LİSTESİ (AGRESİF TEMİZLİK) ---
+    stopwords = {
+        # Zamirler ve Bağlaçlar
+        "bir", "iki", "üç", "ve", "ile", "de", "da", "bu", "şu", "o", "ben", "sen", "biz", "siz", 
+        "onlar", "bana", "sana", "bize", "size", "benim", "senin", "bizim", "sizin", "bende", 
+        "sende", "bizde", "sizde", "bunu", "şunu", "onu", "buna", "şuna", "ona", "böyle", "şöyle",
+        "öyle", "var", "yok", "için", "gibi", "kadar", "diye", "ise", "ki", "mu", "mi", "mı",
+        "ama", "fakat", "lakin", "ancak", "veya", "ya", "hem", "eğer", "zaten", "hani", "işte",
+        "yani", "dolayı", "ötürü", "üzere", "rağmen", "karşı", "kendi", "kendine", "kendim","icin","çünkü",
+        "konuda","halde","icin",
+        
+        # WhatsApp / Sistem Kalıntıları
+        "mesaj", "silindi", "medya", "dahil", "edilmedi", "görüntü", "video", "ses", "dosya",
+        "kişisi", "tarafından", "eklendi", "ayrıldı", "katıldı", "grup", "gruba", "bağlantısıyla",
+        "davet", "link", "https", "http", "www", "com", "tr", "android", "iphone", "web",
+        
+        # Konuşma Dili / Dolgu Kelimeleri
+        "evet", "hayır", "tamam", "peki", "olur", "olmaz", "şey", "çok", "daha", "en", "biraz",
+        "az", "fazla", "kadar", "sadece", "tek", "bence", "sence", "galiba", "sanırım", "belki",
+        "keşke", "neyse", "tabi", "tabii", "aynen", "kesinlikle", "mutlaka", "lütfen", "rica",
+        "teşekkürler", "sağol", "selam", "merhaba", "günaydın", "iyi", "güzel", 
+        "kötü", "hoş", "falan", "filan", "ne", "nasıl", "neden", "niye", "hangi", "kim", "kimse",
+        "her", "herkes", "hiç", "hep", "tüm", "bütün", "zaman", "şimdi", "sonra", "önce", "bugün",
+        "yarın", "dün", "sabah", "akşam", "gece", "saat", "gün", "hafta", "ay", "yıl",
+        "olan", "olarak", "oldu", "olmuş", "olacak", "olsun", "olursa", "olduğu", "olmak",
+        "yapalım", "yaparız", "yaptım", "yapmak", "yapıyor", "geldi", "gitti", "geliyor", "gidiyor",
+        "tekrar", "devam", "başka", "yine", "farklı", "lazım", "gerek", "isteyen",
+        "arkadaşlar", "arkadaşlarr", "selammm", "orada", "burada", "şuan", "varsa", "yoksa", "hemen",
+        "uygun", "müsait", "katılmak", "düşünüyorum", "yardımcı", "bilmiyorum","değil", "çok", "cok", "arada", "yer", "aynı", "ilk", "bile", 
+        "artık", "buna", "bunu", "şeyler", "diğer", "aslında", "hadi",
+        "olmasın", "herkese", "belli", "başka", "süper", "onun", "bizi",
+        "kabul", "yüzden", "yeni", "son", "göre", "kısmı", "türlü",
+        "düzenlendi", "gerçekten", "zaten", "herhangi", "farklı","yaa","valla","yaaa","miyiz","beni","orda","ederim","dpdndşdnd",
+        "arası","şekilde","dedim","istiyorum","isterim","isteyenler","projesi","olması","olurum","aaa","günü","oluyor","olabilir",
+        "iletişime","adına","okula"
+    }
+    
+    # Medya mesajlarını metinden de temizle
+    text = text.replace("<medya dahil edilmedi>", "").replace("medya dahil edilmedi", "")
+    
+    wordcloud = WordCloud(
+        width=800, height=400,
+        background_color='#0E1117',
+        colormap='Wistia',
+        stopwords=stopwords, # <-- AGRESİF LİSTE BURAYA GELDİ
+        min_font_size=10
+    ).generate(text)
+    
+    return wordcloud
 
 # ---------------------------------------------------------
 # 3. ARAYÜZ
@@ -120,7 +171,19 @@ if df is not None:
 
             st.divider()
 
-            # --- EMOJI ANALIZI (EMOJI KUTUPHANESI ILE) ---
+            # --- KELİME BULUTU ---
+            st.markdown("### ☁️ Kelime Bulutu")
+            if col_mesaj and col_mesaj in df.columns:
+                try:
+                    wc = kelime_bulutu_olustur(df, col_mesaj)
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    ax.imshow(wc, interpolation='bilinear'); ax.axis("off"); fig.patch.set_alpha(0)
+                    st.pyplot(fig)
+                except Exception as e: st.error(f"Hata: {e}")
+            
+            st.divider()
+
+            # --- EMOJİ ANALİZİ ---
             st.markdown("### 🤩 Emoji Analizi")
             if col_mesaj and col_mesaj in df.columns:
                 all_text = " ".join(df[col_mesaj].dropna().astype(str).tolist())
