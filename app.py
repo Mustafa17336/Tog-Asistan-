@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="MarmaraTOG Asistanı", page_icon="🤖", layout="wide")
 
 # ---------------------------------------------------------
-# MODEL SEÇİMİ (STRICT MODE - KATI MOD)
+# MODEL SEÇİMİ (GARANTİLİ LİSTE YÖNTEMİ)
 # ---------------------------------------------------------
 def gemini_ayarla():
     if "GOOGLE_API_KEY" in st.secrets:
@@ -20,32 +20,39 @@ def gemini_ayarla():
     genai.configure(api_key=api_key)
     
     try:
-        # Modelleri listele
-        mevcut_modeller = []
+        # Google'dan o an MÜSAİT olan modelleri çekiyoruz
+        uygun_modeller = []
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
-                mevcut_modeller.append(m.name)
+                uygun_modeller.append(m.name)
         
         secilen_model = None
-        
-        # 1. Aşama: Listede açıkça "1.5-flash" ara
-        for model_adi in mevcut_modeller:
-            if "1.5-flash" in model_adi:
-                secilen_model = model_adi
+
+        # 1. ÖNCELİK: Listede isminde "1.5-flash" geçen İLK model
+        # (Örn: models/gemini-1.5-flash-001 veya models/gemini-1.5-flash-latest)
+        for m in uygun_modeller:
+            if "1.5-flash" in m:
+                secilen_model = m
                 break
         
-        # 2. Aşama: Eğer listede bulamazsan BİLE, başka modele gitme.
-        # Doğrudan 1.5 ismini zorla. (Burası 2.5 riskini yok eder)
+        # 2. ÖNCELİK: Eğer 1.5 yoksa, herhangi bir "flash"
         if not secilen_model:
-            secilen_model = "models/gemini-1.5-flash" 
+            for m in uygun_modeller:
+                if "flash" in m:
+                    secilen_model = m
+                    break
 
-        # KANIT: Hangi modelin seçildiğini kullanıcıya göster
-        st.sidebar.success(f"✅ Aktif Model: {secilen_model}")
+        # 3. GÜVENLİK AĞI: Hiçbiri yoksa listedeki ilk modeli al (Asla 404 vermez)
+        if not secilen_model and uygun_modeller:
+            secilen_model = uygun_modeller[0]
+
+        # KANIT: Seçilen resmi ismi ekrana yaz
+        st.sidebar.success(f"✅ Çalışan Model: {secilen_model}")
         
         return genai.GenerativeModel(secilen_model)
 
     except Exception as e:
-        st.error(f"Model hatası: {e}")
+        st.error(f"Bağlantı hatası: {e}")
         st.stop()
 
 model = gemini_ayarla()
@@ -85,7 +92,7 @@ if uploaded_file:
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                     except Exception as e:
-                        st.error(f"Hata: {e}")
+                        st.error(f"Cevap üretilirken hata: {e}")
     except Exception as e:
         st.error(f"Dosya okuma hatası: {e}")
 else:
