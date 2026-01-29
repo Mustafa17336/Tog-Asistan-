@@ -3,6 +3,8 @@ import google.generativeai as genai
 import pandas as pd
 import altair as alt
 import os
+import re
+from collections import Counter
 
 # ---------------------------------------------------------
 # 1. AYARLAR
@@ -20,63 +22,64 @@ def gemini_ayarla():
 model = gemini_ayarla()
 
 # ---------------------------------------------------------
-# 2. DEMO VERİ OLUŞTURUCU
+# 2. YARDIMCI FONKSİYONLAR (EMOJİ BULUCU) 🕵️‍♂️
 # ---------------------------------------------------------
 def demo_veri_olustur():
     data = {
         'Tarih': ['01.01.2026', '01.01.2026', '02.01.2026', '02.01.2026', '03.01.2026', '03.01.2026', '04.01.2026', '04.01.2026'],
         'Saat': ['10:00', '10:05', '14:30', '15:00', '09:00', '12:00', '20:00', '21:00'],
         'Gönderen': ['Ayşe (Başkan)', 'Mehmet (Yazılım)', 'Ayşe (Başkan)', 'Mehmet (Yazılım)', 'Ali (Tasarım)', 'Mehmet (Yazılım)', 'Ayşe (Başkan)', 'Ali (Tasarım)'],
-        'Mesaj': ['Proje ne durumda?', 'Backend bitti.', 'Tasarım nerede?', 'Veritabanı hazır.', 'Logo revizesi tamam.', 'Yemekhaneye giden?', 'Rapor yüklendi.', 'Eline sağlık.'],
+        'Mesaj': ['Proje ne durumda? 🤔', 'Backend bitti. 🔥', 'Tasarım nerede? 🧐', 'Veritabanı hazır. 👍', 'Logo revizesi tamam. 🎨', 'Yemekhaneye giden? 🍔', 'Rapor yüklendi. 📄', 'Eline sağlık. 👏'],
         'Tip': ['Yazı', 'Yazı', 'Yazı', 'Yazı', 'Medya', 'Yazı', 'Yazı', 'Yazı']
     }
     return pd.DataFrame(data)
 
-st.title("📊 Sohbet Analiz Paneli")
+def emojileri_ayikla(text):
+    # Yaygın emoji aralıklarını kapsayan Regex
+    emoji_pattern = re.compile(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002600-\U000026FF\U00002700-\U000027BF]', flags=re.UNICODE)
+    return emoji_pattern.findall(str(text))
 
 # ---------------------------------------------------------
-# 3. VERİ KAYNAĞI SEÇİMİ
+# 3. ARAYÜZ VE VERİ SEÇİMİ
 # ---------------------------------------------------------
+st.title("📊 Sohbet Analiz Paneli")
 st.sidebar.header("1. Veri Kaynağı Seçin")
-secim = st.sidebar.radio(
-    "Nasıl devam etmek istersiniz?",
-    ["📂 Kendi Dosyamı Yükle", "📁 Hazır Veri Seti (Gerçek)", "🧪 Demo Modu (Sentetik)"]
-)
+secim = st.sidebar.radio("Seçenekler:", ["📂 Kendi Dosyamı Yükle", "📁 Hazır Veri Seti (Gerçek)", "🧪 Demo Modu (Sentetik)"])
 
 df = None
 
 if secim == "📂 Kendi Dosyamı Yükle":
     uploaded_file = st.sidebar.file_uploader("WhatsApp Excel'i Yükle", type=["xlsx", "xls"])
     if uploaded_file:
-        try:
-            df = pd.read_excel(uploaded_file)
-        except Exception as e:
-            st.error(f"Dosya okunamadı: {e}")
+        try: df = pd.read_excel(uploaded_file)
+        except Exception as e: st.error(f"Hata: {e}")
 
 elif secim == "📁 Hazır Veri Seti (Gerçek)":
     dosya_yolu = "ornek_veri.xlsx"
     if os.path.exists(dosya_yolu):
         try:
             df = pd.read_excel(dosya_yolu)
-            st.sidebar.success(f"✅ Hazır veri seti yüklendi! ({len(df)} satır)")
-        except Exception as e:
-            st.error(f"Hazır dosya okunurken hata: {e}")
-    else:
-        st.sidebar.warning("⚠️ 'ornek_veri.xlsx' dosyası sunucuda bulunamadı.")
+            st.sidebar.success(f"✅ Hazır veri seti yüklendi!")
+        except Exception as e: st.error(f"Hata: {e}")
+    else: st.sidebar.warning("⚠️ Hazır dosya bulunamadı.")
 
 elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
-    st.sidebar.info("🧪 Demo veriler oluşturuldu.")
+    st.sidebar.info("🧪 Demo veriler yüklendi.")
 
 # ---------------------------------------------------------
-# 4. ANALİZ VE GÖRSELLEŞTİRME
+# 4. ANALİZ MOTORU
 # ---------------------------------------------------------
 if df is not None:
     df = df.replace("Fatih Sarı", "+90 545 655 91 18")
     
-    tahmini_isim = next((c for c in df.columns if any(x in c.lower() for x in ['onderen','ender','author'])), df.columns[0])
-    tahmini_tarih = next((c for c in df.columns if any(x in c.lower() for x in ['arih','date','ime'])), df.columns[1] if len(df.columns)>1 else df.columns[0])
+    # Otomatik Sütun Tahminleri
+    cols = df.columns
+    col_isim = next((c for c in cols if any(x in c.lower() for x in ['onderen','ender','author'])), cols[0])
+    col_tarih = next((c for c in cols if any(x in c.lower() for x in ['arih','date','ime'])), cols[1] if len(cols)>1 else cols[0])
+    col_mesaj = next((c for c in cols if any(x in c.lower() for x in ['mesaj','message','icerik','text'])), None)
 
+    # Chat Verisi Hazırlığı
     chat_df = df.iloc[::-1]
     text_data = ""
     for index, row in chat_df.head(3000).iterrows():
@@ -84,107 +87,107 @@ if df is not None:
 
     tab1, tab2 = st.tabs(["📈 İstatistik Paneli", "💬 Yapay Zeka Asistanı"])
 
+    # --- TAB 1: DASHBOARD ---
     with tab1:
         st.markdown("### 🚀 Genel Bakış")
         c1, c2 = st.columns(2)
-        with c1:
-            col_left = st.selectbox("Sol Grafik Verisi:", df.columns, index=df.columns.get_loc(tahmini_isim))
-        with c2:
-            col_right = st.selectbox("Sağ Grafik Verisi:", df.columns, index=df.columns.get_loc(tahmini_tarih))
+        with c1: selected_user_col = st.selectbox("Kişi Sütunu:", cols, index=cols.get_loc(col_isim))
+        with c2: selected_date_col = st.selectbox("Zaman Sütunu:", cols, index=cols.get_loc(col_tarih))
 
-        if col_left and col_right:
+        if selected_user_col and selected_date_col:
+            # Metrikler
             total_msgs = len(df)
-            uniq_left = df[col_left].nunique()
-            top_left = df[col_left].mode()[0] if not df[col_left].mode().empty else "Yok"
+            top_user = df[selected_user_col].mode()[0] if not df[selected_user_col].mode().empty else "Yok"
             
             m1, m2, m3 = st.columns(3)
-            m1.metric("Toplam Satır", f"{total_msgs}")
-            m2.metric(f"Benzersiz {col_left}", f"{uniq_left}")
-            m3.metric(f"Lider", str(top_left)[:15]+"..." if len(str(top_left))>15 else str(top_left))
+            m1.metric("Toplam Mesaj", f"{total_msgs}")
+            m2.metric("Aktif Kişi", f"{df[selected_user_col].nunique()}")
+            m3.metric("Lider", str(top_user)[:15]+"...")
             
             st.divider()
-            g1, g2 = st.columns(2)
 
+            # Grafikler (Üst Satır)
+            g1, g2 = st.columns(2)
+            
             with g1:
-                st.subheader(f"🏆 {col_left} Analizi")
-                if df[col_left].nunique() > 1000:
-                    st.warning("⚠️ Çok fazla veri var, tablo gösteriliyor.")
-                    st.dataframe(df[col_left].value_counts().head(10), use_container_width=True)
-                else:
-                    data_counts = df[col_left].value_counts().head(10).reset_index()
-                    data_counts.columns = [col_left, "Adet"]
-                    chart = alt.Chart(data_counts).mark_bar().encode(
-                        x=alt.X('Adet', title='Sayısı'),
-                        y=alt.Y(col_left, sort='-x', title=None),
-                        tooltip=[col_left, 'Adet'],
-                        color=alt.value("#3182bd")
-                    ).properties(height=400)
-                    st.altair_chart(chart, use_container_width=True)
+                st.subheader(f"🏆 En Çok Yazanlar")
+                user_counts = df[selected_user_col].value_counts().head(10).reset_index()
+                user_counts.columns = ["Kişi", "Mesaj"]
+                st.altair_chart(alt.Chart(user_counts).mark_bar().encode(
+                    x='Mesaj', y=alt.Y('Kişi', sort='-x'), color=alt.value("#3182bd"), tooltip=['Kişi', 'Mesaj']
+                ).properties(height=350), use_container_width=True)
 
             with g2:
-                st.subheader(f"📊 {col_right} Dağılımı")
-                is_time = "saat" in col_right.lower() or "time" in col_right.lower()
-                is_date = False
+                st.subheader(f"📊 Zaman Analizi")
                 try:
-                    parsed_dates = pd.to_datetime(df[col_right], dayfirst=True, errors='coerce')
-                    if len(parsed_dates.dropna()) > len(df) * 0.5: is_date = True
-                except: pass
+                    is_time = any(x in selected_date_col.lower() for x in ['saat','time'])
+                    if is_time:
+                        t_counts = df[selected_date_col].value_counts().head(24).reset_index()
+                        t_counts.columns = ["Saat", "Mesaj"]
+                        t_counts = t_counts.sort_values("Saat")
+                        st.altair_chart(alt.Chart(t_counts).mark_bar().encode(
+                            x='Saat', y='Mesaj', color=alt.value("orange"), tooltip=['Saat', 'Mesaj']
+                        ).properties(height=350), use_container_width=True)
+                    else:
+                        dates = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
+                        if not dates.empty:
+                            d_counts = df.groupby(dates.dt.date).size().reset_index(name='Mesaj')
+                            d_counts.columns = ['Tarih', 'Mesaj']
+                            st.altair_chart(alt.Chart(d_counts).mark_area(
+                                line={'color':'darkgreen'},
+                                color=alt.Gradient(gradient='linear', stops=[alt.GradientStop(color='darkgreen', offset=0), alt.GradientStop(color='white', offset=1)], x1=1, x2=1, y1=1, y2=0)
+                            ).encode(x='Tarih:T', y='Mesaj:Q', tooltip=['Tarih:T', 'Mesaj']).properties(height=350), use_container_width=True)
+                        else: st.warning("Tarih verisi ayrıştırılamadı.")
+                except: st.warning("Grafik oluşturulamadı.")
 
-                if is_time:
-                    time_counts = df[col_right].value_counts().head(24).reset_index()
-                    time_counts.columns = [col_right, "Adet"]
-                    time_counts = time_counts.sort_values(by=col_right)
-                    c_time = alt.Chart(time_counts).mark_bar().encode(
-                        x=alt.X(col_right, title='Saat'),
-                        y=alt.Y('Adet', title='Mesaj'),
-                        color=alt.value("orange"),
-                        tooltip=[col_right, 'Adet']
-                    ).properties(height=400)
-                    st.altair_chart(c_time, use_container_width=True)
-                elif is_date:
-                    daily = df.groupby(parsed_dates.dt.date).size().reset_index(name='Adet')
-                    daily.columns = ['Tarih', 'Adet']
-                    c_date = alt.Chart(daily).mark_area(
-                        line={'color':'darkgreen'},
-                        color=alt.Gradient(gradient='linear', stops=[alt.GradientStop(color='darkgreen', offset=0), alt.GradientStop(color='white', offset=1)], x1=1, x2=1, y1=1, y2=0)
-                    ).encode(
-                        x=alt.X('Tarih:T', title='Zaman'),
-                        y=alt.Y('Adet:Q', title='Aktivite'),
-                        tooltip=[alt.Tooltip('Tarih:T', format='%d %b %Y'), 'Adet']
-                    ).properties(height=400)
-                    st.altair_chart(c_date, use_container_width=True)
+            st.divider()
+
+            # --- EMOJİ ANALİZİ BÖLÜMÜ (YENİ) ---
+            st.markdown("### 🤩 Emoji Analizi")
+            
+            # Mesaj sütununu kullanıcıya teyit ettirelim
+            col_msg_select = st.selectbox("Mesajların olduğu sütun (Emoji taraması için):", cols, index=cols.get_loc(col_mesaj) if col_mesaj else 0)
+
+            if col_msg_select:
+                # Tüm mesajları birleştir ve emojileri bul
+                all_text = " ".join(df[col_msg_select].dropna().astype(str).tolist())
+                found_emojis = emojileri_ayikla(all_text)
+
+                if found_emojis:
+                    emoji_counts = Counter(found_emojis).most_common(10)
+                    emoji_df = pd.DataFrame(emoji_counts, columns=['Emoji', 'Adet'])
+                    
+                    e1, e2 = st.columns([2, 1])
+                    
+                    with e1:
+                        st.subheader("En Çok Kullanılan Emojiler")
+                        # Bar Chart
+                        e_chart = alt.Chart(emoji_df).mark_bar().encode(
+                            x=alt.X('Adet', title='Kullanım Sayısı'),
+                            y=alt.Y('Emoji', sort='-x', title=None),
+                            color=alt.Color('Adet', legend=None),
+                            tooltip=['Emoji', 'Adet']
+                        ).properties(height=400)
+                        
+                        # Barların ucuna sayı yazdırma
+                        text = e_chart.mark_text(align='left', dx=2).encode(text='Adet')
+                        st.altair_chart(e_chart + text, use_container_width=True)
+                    
+                    with e2:
+                        st.subheader("Lider Emoji 👑")
+                        top_emoji = emoji_df.iloc[0]['Emoji']
+                        top_count = emoji_df.iloc[0]['Adet']
+                        st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{top_emoji}</h1>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='text-align: center;'>Toplam <b>{top_count}</b> kez kullanıldı.</p>", unsafe_allow_html=True)
                 else:
-                    cat_counts = df[col_right].value_counts().head(10).reset_index()
-                    cat_counts.columns = ["Kategori", "Adet"]
-                    base = alt.Chart(cat_counts).encode(theta=alt.Theta("Adet", stack=True))
-                    pie = base.mark_arc(outerRadius=120, innerRadius=60).encode(
-                        color=alt.Color("Kategori"),
-                        order=alt.Order("Adet", sort="descending"),
-                        tooltip=["Kategori", "Adet"]
-                    )
-                    text = base.mark_text(radius=140).encode(text=alt.Text("Adet"), order=alt.Order("Adet", sort="descending"), color=alt.value("white"))
-                    st.altair_chart(pie + text, use_container_width=True)
+                    st.info("Bu sohbette hiç emoji bulunamadı. 😐")
 
+
+    # --- TAB 2: ASİSTAN ---
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
-        
-        # --- YENİ EKLENEN BÖLÜM: ÖRNEK SORULAR ---
-        with st.expander("💡 Ne sorabilirim? (İlham Al)", expanded=True):
-            st.markdown("""
-            **Genel Analiz:**
-            -  "Bu grubun genel amacı ne? Konuşmalar ne üzerine?"
-            -  "Grupta en çok tartışılan konu neydi?"
-            -  "Grubun genel kişilik analizini yapabilir misin?"
-            
-            **Kişiler Hakkında:**
-            -  "Grubun 'gizli lideri' kim gibi duruyor?"
-            -  "Kimler birbiriyle daha iyi anlaşıyor?"
-            -  "Grubun en meraklısı kim?"
-
-            **Detaylı Bilgi:**
-            -  "Yakın zamanda planlanan bir etkinlik veya buluşma var mı?"
-            -  "Cevaplanmamış önemli bir soru var mı?"
-            """)
+        with st.expander("💡 Örnek Sorular", expanded=True):
+            st.markdown("-  Bu grubun genel amacı ne?\n-  En hararetli tartışma neydi?\n-  En komik anları özetle.\n-  Grubun 'gizli lideri' kim?")
         
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
@@ -194,12 +197,7 @@ if df is not None:
             with st.chat_message("assistant"):
                 with st.spinner("Analiz ediliyor..."):
                     try:
-                        full_prompt = f"Veri:\n{text_data}\n\nSoru: {prompt}"
-                        response = model.generate_content(full_prompt)
+                        response = model.generate_content(f"Veri:\n{text_data}\n\nSoru: {prompt}")
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e:
-                        st.error(f"Hata: {e}")
-
-else:
-    st.info("👈 Başlamak için sol menüden bir veri kaynağı seçin.")
+                    except Exception as e: st.error(f"Hata: {e}")
