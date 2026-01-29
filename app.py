@@ -77,7 +77,7 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 if df is not None:
     # --- VERİ TEMİZLİĞİ ---
     # İsim maskeleme (Varsa Fatih Sarı'yı gizle)
-    df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
+    df = df.replace("Fatih Sarı", "+90 545 655 91 18")
     
     # --- OTOMATİK SÜTUN TAHMİNİ ---
     tahmini_isim = next((c for c in df.columns if any(x in c.lower() for x in ['onderen','ender','author'])), df.columns[0])
