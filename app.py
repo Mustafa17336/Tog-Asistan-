@@ -223,7 +223,9 @@ if df is not None:
 
     with tab2:
         st.subheader("💬 Yapay Zeka Asistanı")
-       with st.expander("💡 Örnek Sorular", expanded=True):
+        
+        # --- ÖRNEK SORULAR MENÜSÜ ---
+        with st.expander("💡 Örnek Sorular", expanded=True):
             st.markdown("""
             -  Grup hakkında bana neler söyleyebilirsin?
             -  Grubun genel kişilik analizini çıkarabilir misin?
@@ -232,15 +234,25 @@ if df is not None:
             -  Yakın zamanda planlanan bir etkinlik var mı?
             -  Kasım ayında neler yapılmış?
             """)
-        if "messages" not in st.session_state: st.session_state.messages = []
-        for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
+
+        # --- CHAT GEÇMİŞİ VE GİRİŞ ---
+        if "messages" not in st.session_state: 
+            st.session_state.messages = []
+
+        for m in st.session_state.messages: 
+            st.chat_message(m["role"]).markdown(m["content"])
+
         if prompt := st.chat_input("Sorunuzu yazın..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             st.chat_message("user").markdown(prompt)
+            
             with st.chat_message("assistant"):
                 with st.spinner("Analiz ediliyor..."):
                     try:
-                        response = model.generate_content(f"Veri:\n{text_data}\n\nSoru: {prompt}")
+                        # text_data değişkeni yukarıdaki if bloğundan geliyor
+                        full_prompt = f"Veri:\n{text_data}\n\nSoru: {prompt}"
+                        response = model.generate_content(full_prompt)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e: st.error(f"Hata: {e}")
+                    except Exception as e: 
+                        st.error(f"Hata: {e}")
