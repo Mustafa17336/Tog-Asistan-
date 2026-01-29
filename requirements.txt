@@ -4,3 +4,5 @@ openpyxl
 google-generativeai
 plotly
 emoji
+wordcloud
+matplotlib
