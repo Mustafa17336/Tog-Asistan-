@@ -1,67 +1,121 @@
 import streamlit as st
 import google.generativeai as genai
 import pandas as pd
+import altair as alt
 
 # ---------------------------------------------------------
-# 1. SAYFA AYARLARI
+# 1. AYARLAR
 # ---------------------------------------------------------
-st.set_page_config(
-    page_title="MarmaraTOG Asistanı",
-    page_icon="🤖",
-    layout="wide"
-)
+st.set_page_config(page_title="MarmaraTOG Asistanı", page_icon="📊", layout="wide")
 
-# ---------------------------------------------------------
-# 2. MODEL VE GÜVENLİK
-# ---------------------------------------------------------
 def gemini_ayarla():
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
-    else:
-        st.error("🚨 API Anahtarı bulunamadı! Lütfen Secrets ayarlarını kontrol edin.")
-        st.stop()
-    
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("models/gemini-2.5-flash-preview-09-2025")
+        genai.configure(api_key=api_key)
+        return genai.GenerativeModel("models/gemini-2.5-flash-preview-09-2025")
+    st.error("🚨 API Anahtarı Eksik!")
+    st.stop()
 
 model = gemini_ayarla()
 
-# ---------------------------------------------------------
-# 3. ARAYÜZ BAŞLIĞI
-# ---------------------------------------------------------
-st.title("🤖 MarmaraTOG WhatsApp Analiz")
-st.markdown("Bu panelde hem yapay zeka ile sohbet edebilir hem de grubun istatistiklerini inceleyebilirsiniz.")
+st.title("📊 MarmaraTOG Analiz Paneli")
 
 # ---------------------------------------------------------
-# 4. DOSYA YÜKLEME VE İŞLEME
+# 2. VERİ YÜKLEME
 # ---------------------------------------------------------
 uploaded_file = st.sidebar.file_uploader("WhatsApp Excel Dosyasını Yükle", type=["xlsx", "xls"])
 
 if uploaded_file:
     try:
-        # Veriyi Oku
         df = pd.read_excel(uploaded_file)
         
-        # Orijinal veriyi sakla (Grafikler için)
-        raw_df = df.copy()
+        # --- OTOMATİK SÜTUN TAHMİNİ ---
+        # Tahmin etmeye çalış, bulamazsan ilk sütunu al
+        tahmini_isim_sutunu = next((col for col in df.columns if "onderen" in col.lower() or "ender" in col.lower() or "author" in col.lower()), df.columns[0])
+        tahmini_tarih_sutunu = next((col for col in df.columns if "arih" in col.lower() or "date" in col.lower() or "ime" in col.lower()), df.columns[1] if len(df.columns) > 1 else df.columns[0])
 
-        # Chat için veriyi ters çevir ve metne dök
-        chat_df = df.iloc[::-1]
+        # Veriyi Hazırla (Chat için)
+        chat_df = df.iloc[::-1] # Eskiden yeniye
         text_data = ""
         for index, row in chat_df.iterrows():
-            row_text = " | ".join([str(val) for val in row.values])
-            text_data += row_text + "\n"
-
-        st.sidebar.success(f"✅ Dosya Yüklendi! {len(df)} satır veri.")
+            text_data += " | ".join([str(val) for val in row.values]) + "\n"
 
         # -----------------------------------------------------
-        # SEKME (TAB) YAPISI
+        # SEKME YAPISI
         # -----------------------------------------------------
-        tab1, tab2 = st.tabs(["💬 Yapay Zeka Asistanı", "📊 İstatistik Paneli"])
+        tab1, tab2 = st.tabs(["📈 İstatistik Paneli (Dashboard)", "💬 Yapay Zeka Asistanı"])
 
-        # --- TAB 1: SOHBET ASİSTANI ---
+        # --- TAB 1: DASHBOARD (YENİLENDİ) ---
         with tab1:
-            st.subheader("Sohbet Analizi")
+            st.markdown("### 🚀 Genel Bakış")
+            
+            # Kullanıcıya yine de seçtirelim ama varsayılanı akıllı olsun
+            col_sel1, col_sel2 = st.columns(2)
+            with col_sel1:
+                author_col = st.selectbox("👤 İsimlerin olduğu sütun:", df.columns, index=df.columns.get_loc(tahmini_isim_sutunu))
+            with col_sel2:
+                date_col = st.selectbox("📅 Tarihlerin olduğu sütun:", df.columns, index=df.columns.get_loc(tahmini_tarih_sutunu))
+
+            # --- METRİK KARTLARI ---
+            if author_col and date_col:
+                total_msgs = len(df)
+                total_users = df[author_col].nunique()
+                top_user = df[author_col].mode()[0]
+                
+                # Yan yana 3 kutu
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Toplam Mesaj", f"{total_msgs}")
+                m2.metric("Aktif Kişi Sayısı", f"{total_users}")
+                m3.metric("Grup Lideri (En Çok Yazan)", f"{top_user}")
+                
+                st.divider()
+
+                # --- GRAFİKLER ---
+                g1, g2 = st.columns(2)
+
+                # Grafik 1: En Çok Konuşanlar (YATAY BAR)
+                with g1:
+                    st.subheader("🏆 En Çok Konuşan İlk 10")
+                    user_counts = df[author_col].value_counts().head(10).reset_index()
+                    user_counts.columns = ["Kişi", "Mesaj Sayısı"]
+                    
+                    # Altair ile daha şık grafik
+                    chart = alt.Chart(user_counts).mark_bar().encode(
+                        x='Mesaj Sayısı',
+                        y=alt.Y('Kişi', sort='-x'),
+                        color='Mesaj Sayısı',
+                        tooltip=['Kişi', 'Mesaj Sayısı']
+                    ).properties(height=400)
+                    st.altair_chart(chart, use_container_width=True)
+
+                # Grafik 2: Zaman Çizelgesi (AREA CHART)
+                with g2:
+                    st.subheader("📅 Mesaj Yoğunluğu")
+                    try:
+                        # Tarihleri düzgün parse et (Day First = Türkiye standardı)
+                        df["ParsedDate"] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
+                        daily_counts = df.groupby(df["ParsedDate"].dt.date).size().reset_index(name='Mesaj')
+                        
+                        chart2 = alt.Chart(daily_counts).mark_area(
+                            line={'color':'darkgreen'},
+                            color=alt.Gradient(
+                                gradient='linear',
+                                stops=[alt.GradientStop(color='darkgreen', offset=0),
+                                       alt.GradientStop(color='white', offset=1)],
+                                x1=1, x2=1, y1=1, y2=0
+                            )
+                        ).encode(
+                            x='ParsedDate:T',
+                            y='Mesaj:Q',
+                            tooltip=['ParsedDate', 'Mesaj']
+                        ).properties(height=400)
+                        st.altair_chart(chart2, use_container_width=True)
+                    except:
+                        st.warning("Tarih formatı grafiğe çevrilemedi.")
+
+        # --- TAB 2: AI ASİSTAN ---
+        with tab2:
+            st.subheader("💬 Sohbet Analizi")
             
             if "messages" not in st.session_state:
                 st.session_state.messages = []
@@ -70,13 +124,13 @@ if uploaded_file:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-            if prompt := st.chat_input("Veri hakkında bir soru sor..."):
+            if prompt := st.chat_input("Veri hakkında soru sor..."):
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
 
                 with st.chat_message("assistant"):
-                    with st.spinner("Gemini 2.5 Flash analiz ediyor..."):
+                    with st.spinner("Analiz ediliyor..."):
                         try:
                             full_prompt = f"Veri:\n{text_data}\n\nSoru: {prompt}"
                             response = model.generate_content(full_prompt)
@@ -85,46 +139,8 @@ if uploaded_file:
                         except Exception as e:
                             st.error(f"Hata: {e}")
 
-        # --- TAB 2: İSTATİSTİK PANELİ ---
-        with tab2:
-            st.subheader("Grup İstatistikleri")
-            st.info("Grafiklerin oluşması için aşağıdan ilgili sütunları seçiniz.")
-
-            # 1. En Çok Mesaj Atanlar (Bar Grafiği)
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("### 🏆 En Çok Konuşanlar")
-                # Kullanıcıya "Gönderen" sütunu hangisi diye soruyoruz (Hata riskini sıfırlar)
-                author_col = st.selectbox("Hangi sütunda İsimler/Numaralar var?", df.columns, index=0)
-                
-                if author_col:
-                    top_users = df[author_col].value_counts().head(10) # İlk 10 kişi
-                    st.bar_chart(top_users)
-
-            # 2. Zaman Analizi (Opsiyonel)
-            with col2:
-                st.markdown("### 📅 Veri Dağılımı")
-                date_col = st.selectbox("Hangi sütunda Tarihler var? (Opsiyonel)", ["Seçiniz"] + list(df.columns))
-                
-                if date_col != "Seçiniz":
-                    # Tarihleri gün bazında say
-                    try:
-                        # Tarih formatını anlamaya çalış
-                        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
-                        daily_counts = df[date_col].dt.date.value_counts().sort_index()
-                        st.line_chart(daily_counts)
-                    except:
-                        st.warning("Tarih formatı algılanamadı.")
-                else:
-                    st.write("Zaman grafiği için tarih sütununu seçin.")
-
-            # 3. Ham Veri Önizleme
-            with st.expander("📂 Ham Veriyi Görüntüle"):
-                st.dataframe(df)
-
     except Exception as e:
         st.error(f"Dosya işlenirken hata oluştu: {e}")
 
 else:
-    st.info("👈 Analiz ve İstatistikler için Excel dosyanızı yükleyin.")
+    st.info("👈 Analiz için lütfen Excel dosyanızı yükleyin.")
