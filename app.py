@@ -12,80 +12,119 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 2. MODEL VE GÜVENLİK KURULUMU (PRO VERSİYON)
+# 2. MODEL VE GÜVENLİK
 # ---------------------------------------------------------
 def gemini_ayarla():
-    # Anahtarı SADECE Streamlit Secrets'tan alıyoruz.
-    # Kullanıcıya sormak yok, kutu yok.
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
     else:
-        st.error("🚨 Sistem Hatası: API Anahtarı tanımlanmamış! Lütfen yönetici ile iletişime geçin.")
+        st.error("🚨 API Anahtarı bulunamadı! Lütfen Secrets ayarlarını kontrol edin.")
         st.stop()
     
     genai.configure(api_key=api_key)
-    
-    # Modeli SABİTLEDİK (Kazanan Model)
-    # Preview versiyonu analizde daha iyi olduğu için bunu seçtik.
     return genai.GenerativeModel("models/gemini-2.5-flash-preview-09-2025")
 
 model = gemini_ayarla()
 
 # ---------------------------------------------------------
-# 3. ARAYÜZ
+# 3. ARAYÜZ BAŞLIĞI
 # ---------------------------------------------------------
-st.title("🤖 MarmaraTOG WhatsApp Asistanı")
-st.markdown("Bu asistan, MarmaraTOG WhatsApp kayıtlarını analiz eder. Dosyanızı yükleyin ve sohbete başlayın.")
+st.title("🤖 MarmaraTOG WhatsApp Analiz")
+st.markdown("Bu panelde hem yapay zeka ile sohbet edebilir hem de grubun istatistiklerini inceleyebilirsiniz.")
 
 # ---------------------------------------------------------
-# 4. İŞLEMLER
+# 4. DOSYA YÜKLEME VE İŞLEME
 # ---------------------------------------------------------
 uploaded_file = st.sidebar.file_uploader("WhatsApp Excel Dosyasını Yükle", type=["xlsx", "xls"])
 
 if uploaded_file:
     try:
+        # Veriyi Oku
         df = pd.read_excel(uploaded_file)
         
-        # Veriyi ters çevir (En güncel mesaj en üstte olsun)
-        df = df.iloc[::-1]
-        
+        # Orijinal veriyi sakla (Grafikler için)
+        raw_df = df.copy()
+
+        # Chat için veriyi ters çevir ve metne dök
+        chat_df = df.iloc[::-1]
         text_data = ""
-        for index, row in df.iterrows():
+        for index, row in chat_df.iterrows():
             row_text = " | ".join([str(val) for val in row.values])
             text_data += row_text + "\n"
 
-        st.success(f"✅ Dosya başarıyla yüklendi! Toplam {len(df)} satır veri analize hazır.")
+        st.sidebar.success(f"✅ Dosya Yüklendi! {len(df)} satır veri.")
 
-        # Sohbet Geçmişi Yönetimi
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+        # -----------------------------------------------------
+        # SEKME (TAB) YAPISI
+        # -----------------------------------------------------
+        tab1, tab2 = st.tabs(["💬 Yapay Zeka Asistanı", "📊 İstatistik Paneli"])
 
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+        # --- TAB 1: SOHBET ASİSTANI ---
+        with tab1:
+            st.subheader("Sohbet Analizi")
+            
+            if "messages" not in st.session_state:
+                st.session_state.messages = []
 
-        # Kullanıcı Soru Sorduğunda
-        if prompt := st.chat_input("Sorunuzu yazın..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
-            with st.chat_message("assistant"):
-                with st.spinner("Gemini 2.5 Flash (Preview) analiz ediyor..."):
+            if prompt := st.chat_input("Veri hakkında bir soru sor..."):
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                with st.chat_message("assistant"):
+                    with st.spinner("Gemini 2.5 Flash analiz ediyor..."):
+                        try:
+                            full_prompt = f"Veri:\n{text_data}\n\nSoru: {prompt}"
+                            response = model.generate_content(full_prompt)
+                            st.markdown(response.text)
+                            st.session_state.messages.append({"role": "assistant", "content": response.text})
+                        except Exception as e:
+                            st.error(f"Hata: {e}")
+
+        # --- TAB 2: İSTATİSTİK PANELİ ---
+        with tab2:
+            st.subheader("Grup İstatistikleri")
+            st.info("Grafiklerin oluşması için aşağıdan ilgili sütunları seçiniz.")
+
+            # 1. En Çok Mesaj Atanlar (Bar Grafiği)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 🏆 En Çok Konuşanlar")
+                # Kullanıcıya "Gönderen" sütunu hangisi diye soruyoruz (Hata riskini sıfırlar)
+                author_col = st.selectbox("Hangi sütunda İsimler/Numaralar var?", df.columns, index=0)
+                
+                if author_col:
+                    top_users = df[author_col].value_counts().head(10) # İlk 10 kişi
+                    st.bar_chart(top_users)
+
+            # 2. Zaman Analizi (Opsiyonel)
+            with col2:
+                st.markdown("### 📅 Veri Dağılımı")
+                date_col = st.selectbox("Hangi sütunda Tarihler var? (Opsiyonel)", ["Seçiniz"] + list(df.columns))
+                
+                if date_col != "Seçiniz":
+                    # Tarihleri gün bazında say
                     try:
-                        # SINIRSIZ MOD: text_data'nın tamamını gönderiyoruz.
-                        # Ücretli sürümde 1 Milyon token limitin olduğu için
-                        # [:25000] gibi kesmelere gerek yok.
-                        full_prompt = f"Veri:\n{text_data}\n\nSoru: {prompt}"
-                        
-                        response = model.generate_content(full_prompt)
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e:
-                        st.error(f"Bir hata oluştu: {e}")
+                        # Tarih formatını anlamaya çalış
+                        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                        daily_counts = df[date_col].dt.date.value_counts().sort_index()
+                        st.line_chart(daily_counts)
+                    except:
+                        st.warning("Tarih formatı algılanamadı.")
+                else:
+                    st.write("Zaman grafiği için tarih sütununu seçin.")
+
+            # 3. Ham Veri Önizleme
+            with st.expander("📂 Ham Veriyi Görüntüle"):
+                st.dataframe(df)
 
     except Exception as e:
-        st.error(f"Dosya okuma hatası: {e}")
+        st.error(f"Dosya işlenirken hata oluştu: {e}")
 
 else:
-    st.info("👈 Başlamak için lütfen sol menüden Excel dosyanızı yükleyin.")
+    st.info("👈 Analiz ve İstatistikler için Excel dosyanızı yükleyin.")
