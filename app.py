@@ -7,7 +7,8 @@ import os
 # ---------------------------------------------------------
 # 1. AYARLAR
 # ---------------------------------------------------------
-st.set_page_config(page_title="MarmaraTOG Asistanı", page_icon="📊", layout="wide")
+# Sayfa Başlığı Güncellendi
+st.set_page_config(page_title="Sohbet Analiz Paneli", page_icon="📊", layout="wide")
 
 def gemini_ayarla():
     if "GOOGLE_API_KEY" in st.secrets:
@@ -32,10 +33,11 @@ def demo_veri_olustur():
     }
     return pd.DataFrame(data)
 
-st.title("📊 MarmaraTOG Analiz Paneli")
+# --- ANA BAŞLIK GÜNCELLENDİ ---
+st.title("📊 Sohbet Analiz Paneli")
 
 # ---------------------------------------------------------
-# 3. VERİ KAYNAĞI SEÇİMİ (YENİLENDİ) 🎛️
+# 3. VERİ KAYNAĞI SEÇİMİ
 # ---------------------------------------------------------
 st.sidebar.header("1. Veri Kaynağı Seçin")
 secim = st.sidebar.radio(
@@ -56,7 +58,7 @@ if secim == "📂 Kendi Dosyamı Yükle":
 
 # --- SENARYO 2: HAZIR GERÇEK VERİ ---
 elif secim == "📁 Hazır Veri Seti (Gerçek)":
-    dosya_yolu = "ornek_veri.xlsx" # Klasördeki dosya adı
+    dosya_yolu = "ornek_veri.xlsx"
     if os.path.exists(dosya_yolu):
         try:
             df = pd.read_excel(dosya_yolu)
@@ -76,8 +78,7 @@ elif secim == "🧪 Demo Modu (Sentetik)":
 # ---------------------------------------------------------
 if df is not None:
     # --- VERİ TEMİZLİĞİ ---
-    # İsim maskeleme (Varsa Fatih Sarı'yı gizle)
-    df = df.replace("Fatih Sarı", "+90 545 655 91 18")
+    df = df.replace("Fatih Sarı", "+90 5XX XXX XX XX")
     
     # --- OTOMATİK SÜTUN TAHMİNİ ---
     tahmini_isim = next((c for c in df.columns if any(x in c.lower() for x in ['onderen','ender','author'])), df.columns[0])
@@ -85,7 +86,6 @@ if df is not None:
 
     chat_df = df.iloc[::-1]
     text_data = ""
-    # Sadece son 3000 satırı alalım ki çok büyük dosyalarda prompt şişmesin
     for index, row in chat_df.head(3000).iterrows():
         text_data += " | ".join([str(val) for val in row.values]) + "\n"
 
@@ -176,7 +176,7 @@ if df is not None:
                     st.altair_chart(pie + text, use_container_width=True)
 
     with tab2:
-        st.subheader("💬 Sohbet Analizi")
+        st.subheader("💬 Yapay Zeka Asistanı")
         if "messages" not in st.session_state: st.session_state.messages = []
         for m in st.session_state.messages: st.chat_message(m["role"]).markdown(m["content"])
         if prompt := st.chat_input("Sorunuzu yazın..."):
