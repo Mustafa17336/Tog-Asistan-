@@ -121,12 +121,6 @@ elif secim == "🧪 Demo Modu (Sentetik)":
     df = demo_veri_olustur()
     st.sidebar.info("🧪 Demo modu aktif.")
 
-# --- İMZA ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 👨‍💻 Geliştirici")
-st.sidebar.caption("Bu proje **Gemini 2.5 Flash** altyapısı kullanılarak geliştirilmiştir.")
-st.sidebar.info("**Fatih Sarı**\nMarmara Üniv. İstatistik 📉")
-
 # ---------------------------------------------------------
 # 4. ANALİZ MOTORU
 # ---------------------------------------------------------
@@ -146,7 +140,7 @@ if df is not None:
     with tab1:
         st.markdown("### 🚀 Genel Bakış")
         c1, c2 = st.columns(2)
-        with c1: selected_user_col = st.selectbox("Kişi Sütunu:", cols, index=cols.get_loc(col_isim))
+        with c1: selected_user_col = st.selectbox("İnceleme Sütunu:", cols, index=cols.get_loc(col_isim))
         with c2: selected_date_col = st.selectbox("Zaman Sütunu:", cols, index=cols.get_loc(col_tarih))
 
         if selected_user_col and selected_date_col:
@@ -160,7 +154,7 @@ if df is not None:
             
             # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - SOL GRAFİK) ---
             with g1:
-                st.subheader("🏆 En Çok Yazanlar")
+                st.subheader(" Mesaj Frekans Analizi")
                 try:
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
                     uc.columns = ["Deger", "Adet"] 
@@ -195,7 +189,7 @@ if df is not None:
                     else:
                         d = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
                         if d.empty:
-                            st.warning("⚠️ Seçilen sütunda tarih verisi okunamadı. Lütfen 'Tarih' sütununu seçin.")
+                            st.warning("⚠️ Seçilen sütunda zaman verisi okunamadı. Lütfen 'Tarih veya Saat' sütununu seçin.")
                         else:
                             dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
                             dc.columns = ['Tarih', 'GunlukMesaj']
@@ -253,12 +247,12 @@ if df is not None:
         st.subheader("💬 Yapay Zeka Asistanı")
         with st.expander("💡 Örnek Sorular", expanded=True):
             st.markdown("""
-            - 🧐 Grup hakkında bana neler söyleyebilirsin?
-            - 🧠 Grubun genel kişilik analizini çıkarabilir misin?
-            - 🕵️‍♂️ Grubun gizli lideri kim?
-            - 🤝 Kimler birbiriyle daha iyi anlaşıyor?
-            - 📅 Yakın zamanda planlanan bir etkinlik var mı?
-            - 🍂 Kasım ayında neler yapılmış?
+            -  Grup hakkında bana neler söyleyebilirsin?
+            -  Grubun genel kişilik analizini çıkarabilir misin?
+            - 🕵️ Grubun gizli lideri kim?
+            -  Kimler birbiriyle daha iyi anlaşıyor?
+            -  Yakın zamanda planlanan bir etkinlik var mı?
+            -  Kasım ayında neler yapılmış?
             """)
 
         if "messages" not in st.session_state: st.session_state.messages = []
