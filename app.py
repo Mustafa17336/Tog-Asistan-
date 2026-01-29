@@ -158,40 +158,51 @@ if df is not None:
 
             g1, g2 = st.columns(2)
             
-            # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - DİNAMİK BAŞLIKLI) ---
+            # --- GRAFİK 1: EN ÇOK YAZANLAR (ALTAIR - SOL GRAFİK) ---
             with g1:
                 st.subheader("🏆 En Çok Yazanlar")
                 try:
                     uc = df[selected_user_col].value_counts().head(10).reset_index()
-                    uc.columns = ["Deger", "Adet"] # Sütun isimlerini sabitledik (Altair hata vermesin diye)
+                    uc.columns = ["Deger", "Adet"] 
                     
                     chart = alt.Chart(uc).mark_bar().encode(
                         x=alt.X('Adet', title='Mesaj Sayısı'), 
-                        y=alt.Y('Deger', sort='-x', title=selected_user_col), # <-- BURASI ARTIK DİNAMİK!
+                        y=alt.Y('Deger', sort='-x', title=selected_user_col),
                         color=alt.value("#3182bd"),
-                        tooltip=[alt.Tooltip('Deger', title=selected_user_col), alt.Tooltip('Adet', title='Mesaj')]
+                        tooltip=['Deger', 'Adet']
                     ).properties(height=350)
                     
                     st.altair_chart(chart, use_container_width=True)
                 except Exception as e: st.warning(f"Grafik hatası: {e}")
 
-            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY) ---
+            # --- GRAFİK 2: ZAMAN ANALİZİ (PLOTLY - SAĞ GRAFİK - TAMİR EDİLDİ) ---
             with g2:
                 st.subheader("📊 Zaman Analizi")
                 try:
+                    # Senaryo A: Eğer sütun "Saat" içeriyorsa -> Sadece Saati (00-23) al
                     if any(x in selected_date_col.lower() for x in ['saat','time','hour']):
-                        tc = df[selected_date_col].value_counts().head(24).reset_index()
+                        # Saatleri temizle (Sadece ilk 2 haneyi al: "14:39" -> "14")
+                        df['TempSaat'] = df[selected_date_col].astype(str).str[:2]
+                        tc = df['TempSaat'].value_counts().reset_index()
                         tc.columns = ["Saat", "Adet"]
                         tc = tc.sort_values("Saat")
+                        
                         fig_time = px.bar(tc, x='Saat', y='Adet', color='Adet', color_continuous_scale='Oranges')
+                        fig_time.update_layout(xaxis_title="Saat Dilimi (00-23)", yaxis_title="Mesaj Sayısı")
                         st.plotly_chart(fig_time, use_container_width=True)
+                    
+                    # Senaryo B: Tarih ise
                     else:
                         d = pd.to_datetime(df[selected_date_col], dayfirst=True, errors='coerce').dropna()
-                        dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
-                        dc.columns = ['Tarih', 'GunlukMesaj']
-                        fig_date = px.area(dc, x='Tarih', y='GunlukMesaj', color_discrete_sequence=['#2ecc71'])
-                        st.plotly_chart(fig_date, use_container_width=True)
-                except Exception as e: st.warning(f"Grafik hatası: {e}")
+                        if d.empty:
+                            st.warning("⚠️ Seçilen sütunda tarih verisi okunamadı. Lütfen 'Tarih' sütununu seçin.")
+                        else:
+                            dc = df.groupby(d.dt.date).size().reset_index(name='GunlukMesaj')
+                            dc.columns = ['Tarih', 'GunlukMesaj']
+                            fig_date = px.area(dc, x='Tarih', y='GunlukMesaj', color_discrete_sequence=['#2ecc71'])
+                            st.plotly_chart(fig_date, use_container_width=True)
+                            
+                except Exception as e: st.error(f"Zaman grafiği hatası: {e}")
 
             st.divider()
 
